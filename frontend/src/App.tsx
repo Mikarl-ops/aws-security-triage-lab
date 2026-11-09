@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "./api";
+import { AnalyticsCharts } from "./components/AnalyticsCharts";
 import { AuthScreen } from "./components/AuthScreen";
 import { FindingDetails } from "./components/FindingDetails";
 import { FindingsTable, type FindingFiltersView } from "./components/FindingsTable";
 import type {
   AuditEvent,
   Finding,
+  FindingAnalytics,
   FindingListItem,
   FindingNote,
   FindingStatus,
@@ -67,6 +69,9 @@ export function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [summary, setSummary] = useState(emptySummary);
+  const [analytics, setAnalytics] = useState<FindingAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [findings, setFindings] = useState<FindingListItem[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
@@ -98,6 +103,15 @@ export function App() {
       ...(filters.source === "all" ? {} : { source: filters.source }),
     }),
     [filters, page],
+  );
+
+  const analyticsFilters = useMemo(
+    () => ({
+      ...(filters.status === "all" ? {} : { status: filters.status }),
+      ...(filters.severity === "all" ? {} : { severity: filters.severity }),
+      ...(filters.source === "all" ? {} : { source: filters.source }),
+    }),
+    [filters],
   );
 
   useEffect(() => {
@@ -151,6 +165,33 @@ export function App() {
       active = false;
     };
   }, [authState, queryFilters, refreshToken, user]);
+
+  useEffect(() => {
+    if (authState !== "authenticated" || !user) return;
+    let active = true;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    api.getAnalytics(analyticsFilters)
+      .then((result) => {
+        if (active) setAnalytics(result);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setUser(null);
+          setAuthState("anonymous");
+          setAuthError("Your session has expired. Sign in again to continue.");
+        } else {
+          setAnalyticsError(friendlyError(error));
+        }
+      })
+      .finally(() => {
+        if (active) setAnalyticsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [analyticsFilters, authState, refreshToken, user]);
 
   useEffect(() => {
     if (!selectedId || authState !== "authenticated") return;
@@ -487,6 +528,8 @@ export function App() {
               <span className="summary-footnote">Closed with a recorded reason</span>
             </article>
           </section>
+
+          <AnalyticsCharts analytics={analytics} error={analyticsError} loading={analyticsLoading} />
 
           <FindingsTable
             error={dashboardError}

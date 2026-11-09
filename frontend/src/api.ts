@@ -1,6 +1,7 @@
 import type {
   AuditEvent,
   Finding,
+  FindingAnalytics,
   FindingListItem,
   FindingNote,
   FindingSeverity,
@@ -17,6 +18,8 @@ export interface FindingFilters {
   severity?: FindingSeverity;
   source?: string;
 }
+
+export type AnalyticsFilters = Pick<FindingFilters, "status" | "severity" | "source">;
 
 interface ApiProblem {
   title?: string;
@@ -97,6 +100,16 @@ export const api = {
 
   getSummary() {
     return request<FindingSummary>("/findings/summary");
+  },
+
+  getAnalytics(filters: AnalyticsFilters) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.severity) params.set("severity", filters.severity);
+    if (filters.source) params.set("source", filters.source);
+    const queryString = params.toString();
+    const query = queryString ? `?${queryString}` : "";
+    return request<FindingAnalytics>(`/findings/analytics${query}`);
   },
 
   listFindings(filters: FindingFilters) {

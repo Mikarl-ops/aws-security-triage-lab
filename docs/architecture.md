@@ -4,7 +4,9 @@ This document separates the current prototype from the intended pilot architectu
 
 ## Current repository
 
-The repository currently contains a React and TypeScript dashboard with synthetic fixtures. It uses the API contract from the separate Cloud Security Findings Tracker for local preview. This repository does not yet contain its own Flask service, PostgreSQL schema, or AWS integration.
+The repository contains a React and TypeScript dashboard and its own Flask/PostgreSQL API. The local Compose stack loads fabricated findings, and the API provides session-based analyst/viewer roles, notes, status changes, audit history, and server-side summary and analytics responses. There is no AWS importer or live AWS connection yet.
+
+The analytics endpoint applies the selected status, severity, and source filters to the full set of findings observed in the last 30 UTC calendar days. It returns resource-type counts and one daily bucket per UTC date, including dates with zero findings. The table's page and page size do not affect aggregates.
 
 ## Intended local pilot
 
@@ -32,8 +34,9 @@ Keep provider status distinct from the analyst's triage status. An import update
 
 Analytics endpoints must use the same authorization and filter semantics as the findings queue, then aggregate across all matching records. They must not infer totals from a paginated list response.
 
-- Resource-type counts include a defined unknown bucket and state their filter scope.
-- Time-series buckets use an explicitly selected provider timestamp and timezone convention.
+- The current analytics endpoint filters by analyst status, severity, and source. Both charts describe the same filtered cohort and 30-day UTC window.
+- Resource-type counts include an `Unknown` bucket for absent, blank, or unreasonably long values.
+- Time-series buckets use the finding's `observed_at` timestamp normalized to UTC and include zero-count dates.
 - Regional summaries classify location as a Region, global, or unknown.
 - Source-IP geography, if added, is labeled separately from resource Region.
 - Local priority is a documented application rule, not provider severity.

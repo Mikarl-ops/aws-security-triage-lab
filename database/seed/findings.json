@@ -1,0 +1,74 @@
+[
+  {
+    "source": "cloudtrail",
+    "source_event_id": "synthetic-event-001",
+    "title": "Repeated failed console sign-ins",
+    "description": "A synthetic identity scenario recorded repeated failed console sign-ins.",
+    "evidence_summary": "Twenty-three failed sign-in attempts across three fabricated source addresses in eight minutes.",
+    "metadata": {"region": "ap-southeast-1", "resource_type": "iam-user", "event_name": "ConsoleLogin"},
+    "severity": "critical",
+    "status": "new",
+    "observed_at": "2026-10-30T09:42:00Z",
+    "resolution_reason": null
+  },
+  {
+    "source": "config",
+    "source_event_id": "synthetic-event-002",
+    "title": "Storage policy allows public access",
+    "description": "A simulated configuration check detected a public-read bucket policy.",
+    "evidence_summary": "A test policy grants read access to an unauthenticated principal.",
+    "metadata": {"region": "ap-southeast-2", "resource_type": "storage-bucket", "resource_id": "demo-assets-42"},
+    "severity": "high",
+    "status": "investigating",
+    "observed_at": "2026-10-30T08:15:00Z",
+    "resolution_reason": null
+  },
+  {
+    "source": "guardduty",
+    "source_event_id": "synthetic-event-003",
+    "title": "Unusual API activity from a new region",
+    "description": "A fabricated principal accessed an unfamiliar set of read-only actions.",
+    "evidence_summary": "The activity differs from the sample principal's baseline region and service mix.",
+    "metadata": {"region": "eu-west-1", "resource_type": "iam-role", "event_name": "AssumeRole"},
+    "severity": "medium",
+    "status": "investigating",
+    "observed_at": "2026-10-30T07:58:00Z",
+    "resolution_reason": null
+  },
+  {
+    "source": "iam-audit",
+    "source_event_id": "synthetic-event-004",
+    "title": "Unused access key is older than policy allows",
+    "description": "The sample access key has not been used recently and exceeds the rotation window.",
+    "evidence_summary": "Last use is outside the configured 90-day review window.",
+    "metadata": {"region": "ap-southeast-1", "resource_type": "access-key", "resource_id": "key-demo-04"},
+    "severity": "medium",
+    "status": "new",
+    "observed_at": "2026-10-30T06:40:00Z",
+    "resolution_reason": null
+  },
+  {
+    "source": "config",
+    "source_event_id": "synthetic-event-005",
+    "title": "Database snapshot is not encrypted",
+    "description": "A synthetic database snapshot missed the encryption control during creation.",
+    "evidence_summary": "The sample snapshot was created without the expected encryption flag.",
+    "metadata": {"region": "us-east-1", "resource_type": "database-snapshot"},
+    "severity": "low",
+    "status": "resolved",
+    "observed_at": "2026-10-29T15:12:00Z",
+    "resolution_reason": "The snapshot was replaced with an encrypted synthetic copy."
+  },
+  {
+    "source": "config",
+    "source_event_id": "synthetic-event-006",
+    "title": "Security group exposes an unused test port",
+    "description": "A lab-only security group includes a port used by a retired test fixture.",
+    "evidence_summary": "The port is not referenced by active services in the synthetic account.",
+    "metadata": {"region": "ap-southeast-1", "resource_type": "security-group", "event_name": "AuthorizeSecurityGroupIngress"},
+    "severity": "informational",
+    "status": "dismissed",
+    "observed_at": "2026-10-29T12:26:00Z",
+    "resolution_reason": "Confirmed as an isolated lab fixture with no active workload attached."
+  }
+]
