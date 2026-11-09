@@ -1,0 +1,60 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Copy .env.example to .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Copy .env.example to .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a local-only password in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - triage-lab-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?Copy .env.example to .env}:${POSTGRES_PASSWORD:?Set a local-only password in .env}@db:5432/${POSTGRES_DB:?Copy .env.example to .env}
+      DEMO_SEED_FILE: /app/database/seed/findings.json
+      SECRET_KEY: ${SECRET_KEY:?Set a local-only secret key in .env}
+      SESSION_COOKIE_SECURE: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5000:5000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/v1/health/ready', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_PROXY_TARGET: http://api:5000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:5173"
+
+volumes:
+  triage-lab-db-data:

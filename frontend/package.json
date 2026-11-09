@@ -1,5 +1,5 @@
 {
-  "name": "cloud-security-findings-tracker-frontend",
+  "name": "aws-security-triage-lab-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",

@@ -38,6 +38,18 @@ export interface FindingSummary {
   by_severity: Record<FindingSeverity, number>;
 }
 
+export interface FindingAnalytics {
+  window: {
+    days: number;
+    start: string;
+    end: string;
+    timezone: "UTC";
+  };
+  total: number;
+  by_resource_type: Array<{ resource_type: string; count: number }>;
+  by_observed_day: Array<{ day: string; count: number }>;
+}
+
 export interface FindingNote {
   id: string;
   author: string;

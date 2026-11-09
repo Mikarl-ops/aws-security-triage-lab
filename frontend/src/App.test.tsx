@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "./api";
 import { App } from "./App";
 import { demoFindings, demoHistoryByFinding, demoNotesByFinding } from "./demoData";
-import type { AuditEvent, Finding, FindingNote, FindingStatus, FindingSummary, SessionUser } from "./types";
+import type { AuditEvent, Finding, FindingAnalytics, FindingNote, FindingStatus, FindingSummary, SessionUser } from "./types";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -14,6 +14,7 @@ vi.mock("./api", async (importOriginal) => {
       login: vi.fn(),
       logout: vi.fn(),
       getSummary: vi.fn(),
+      getAnalytics: vi.fn(),
       listFindings: vi.fn(),
       getFinding: vi.fn(),
       listNotes: vi.fn(),
@@ -57,6 +58,46 @@ beforeEach(() => {
   mockedApi.login.mockResolvedValue(analyst);
   mockedApi.logout.mockResolvedValue(undefined);
   mockedApi.getSummary.mockImplementation(async () => summarize(serverFindings));
+  mockedApi.getAnalytics.mockImplementation(async (filters) => {
+    const matching = serverFindings.filter(
+      (finding) =>
+        (!filters.status || finding.status === filters.status) &&
+        (!filters.severity || finding.severity === filters.severity) &&
+        (!filters.source || finding.source === filters.source),
+    );
+    const today = new Date();
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - 29);
+    const dayCounts = new Map<string, number>();
+    for (let offset = 0; offset < 30; offset += 1) {
+      const day = new Date(start);
+      day.setUTCDate(start.getUTCDate() + offset);
+      dayCounts.set(day.toISOString().slice(0, 10), 0);
+    }
+    const resourceCounts = new Map<string, number>();
+    for (const finding of matching) {
+      if (finding.observed_at < start.toISOString() || finding.observed_at >= new Date(end.getTime() + 86_400_000).toISOString()) {
+        continue;
+      }
+      const day = finding.observed_at.slice(0, 10);
+      dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
+      const type = typeof finding.metadata.resource_type === "string" ? finding.metadata.resource_type : "Unknown";
+      resourceCounts.set(type, (resourceCounts.get(type) ?? 0) + 1);
+    }
+    const result: FindingAnalytics = {
+      window: {
+        days: 30,
+        start: start.toISOString().slice(0, 10),
+        end: end.toISOString().slice(0, 10),
+        timezone: "UTC",
+      },
+      total: [...dayCounts.values()].reduce((sum, count) => sum + count, 0),
+      by_resource_type: [...resourceCounts].map(([resource_type, count]) => ({ resource_type, count })),
+      by_observed_day: [...dayCounts].map(([day, count]) => ({ day, count })),
+    };
+    return result;
+  });
   mockedApi.listFindings.mockImplementation(async (filters) => {
     const matching = serverFindings.filter(
       (finding) =>

@@ -5,14 +5,15 @@ A local-first project for exploring how AWS security findings can enter an analy
 ## Current state
 
 - The repository has a responsive React and TypeScript dashboard baseline.
-- The dashboard currently uses synthetic findings and the API contract from the separate [Cloud Security Findings Tracker](https://github.com/Mikarl-ops/cloud-security-findings-tracker).
-- This repository does not yet contain its own Flask API, PostgreSQL schema, or AWS importer.
+- The dashboard and this repository's Flask/PostgreSQL API use synthetic findings.
+- The API includes session-based analyst/viewer roles, notes, audit history, and a filtered analytics endpoint.
+- This repository does not yet contain an AWS importer or a live AWS connection.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.
 
 ## Project direction
 
-The first application slice is server-backed analytics: findings by resource type and findings over time. Aggregates must cover all matching findings, not just the current table page. A Region map can follow once resource location is modeled as regional, global, or unknown. Source-IP geography is a separate concept and must not be presented as resource location.
+The first application slice is server-backed analytics: findings by resource type and findings over time. The charts use the last 30 UTC calendar days and aggregate every matching finding, independent of table pagination. A Region map can follow once resource location is modeled as regional, global, or unknown. Source-IP geography is a separate concept and must not be presented as resource location.
 
 The first AWS source under consideration is IAM Access Analyzer external-access findings. The planned importer is read-only, bounded, idempotent, and uses a field allowlist. It will support a dry run and preserve analyst-owned status, notes, and audit history when provider data changes. A documented local priority rule will be used where triage needs one; provider severity is not assumed.
 
@@ -20,20 +21,26 @@ See the evolving project documents:
 
 - [Project plan](docs/project-plan.md)
 - [Architecture](docs/architecture.md)
+- [API contract](docs/api-contract.md)
 - [Data handling and authorization](docs/data-handling.md)
 
 ## Preview the dashboard
 
-Start the separate tracker's local API and database with its synthetic seed and a local analyst account. From `frontend/`, use the Node version in `.nvmrc` and run:
+Copy `.env.example` to `.env`. Replace the local-only PostgreSQL password and Flask secret key with distinct random values; use a hex password so it is safe inside the database URL. From the repository root, start the local database, API, and frontend:
 
 ```text
-npm ci
-npm run dev -- --host 127.0.0.1 --port 5180 --strictPort
+docker compose up --build
 ```
 
-Open <http://127.0.0.1:5180> and sign in. Vite proxies API calls to `http://127.0.0.1:5000` by default. Set `VITE_API_PROXY_TARGET` before starting Vite if the local API uses a different port.
+Create a local analyst login in another terminal:
 
-Theme colors, fonts, surfaces, and responsive breakpoints are in [styles.css](frontend/src/styles.css). The frontend scripts include linting, tests, and a production build; run them when implementation work calls for verification.
+```text
+docker compose exec api flask --app tracker:create_app create-user analyst --role analyst
+```
+
+Open <http://127.0.0.1:5173> and sign in. The Compose services bind to host loopback and load fabricated findings only. For a non-Compose setup, see [backend setup](backend/README.md).
+
+Theme colors, fonts, surfaces, and responsive breakpoints are in [styles.css](frontend/src/styles.css). The frontend scripts include linting, tests, and a production build.
 
 ## Scope boundaries
 

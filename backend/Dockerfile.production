@@ -1,0 +1,33 @@
+FROM python:3.12-alpine3.24 AS base
+RUN apk upgrade --no-cache
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+
+FROM base AS build
+WORKDIR /build/backend
+COPY backend/requirements-production.lock backend/pyproject.toml backend/README.md ./
+COPY backend/src ./src
+RUN python -m pip install --no-cache-dir setuptools==84.1.0 \
+    && python -m pip wheel --no-cache-dir --no-deps --only-binary=:all: --wheel-dir /wheels -r requirements-production.lock \
+    && python -m pip wheel --no-cache-dir --no-deps --no-build-isolation --wheel-dir /wheels .
+
+FROM base AS runtime
+COPY --from=build /wheels /wheels
+COPY backend/requirements-production.lock /tmp/requirements-production.lock
+RUN python -m venv /opt/venv \
+    && /opt/venv/bin/python -m pip install --no-index --find-links=/wheels -r /tmp/requirements-production.lock \
+    && /opt/venv/bin/python -m pip install --no-index --no-deps /wheels/aws_security_triage_lab_backend-*.whl \
+    && /opt/venv/bin/python -m pip check \
+    && /opt/venv/bin/python -m pip uninstall --yes pip \
+    && python -m pip uninstall --yes pip \
+    && rm -rf /wheels /tmp/requirements-production.lock \
+    && addgroup -g 10001 app \
+    && adduser -D -H -G app -u 10001 app
+ENV PATH="/opt/venv/bin:${PATH}" APP_ENV=production SESSION_COOKIE_SECURE=true \
+    DEMO_SEED_FILE=/app/database/seed/findings.json TMPDIR=/tmp
+COPY backend/migrations /app/backend/migrations
+COPY database/seed/findings.json /app/database/seed/findings.json
+COPY backend/certs/rds-global-bundle.pem /etc/tracker/rds-ca.pem
+WORKDIR /app/backend
+USER 10001:10001
+EXPOSE 8000
+CMD ["gunicorn", "--config", "python:tracker.gunicorn_config", "tracker:create_app()"]

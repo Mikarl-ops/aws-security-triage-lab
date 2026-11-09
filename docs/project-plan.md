@@ -21,11 +21,14 @@ Current AWS service terms and costs must be verified before choosing or enabling
 
 ### 1. Analytics contracts and dashboard
 
-- Add aggregate API responses for counts by resource type and findings over time.
-- Calculate aggregates over the complete filtered result set, independent of table pagination.
-- Define timestamp semantics, time buckets, filter behavior, empty states, and treatment of unknown resource types.
+- [x] Add aggregate API responses for counts by resource type and findings over time.
+- [x] Calculate aggregates over the complete filtered result set, independent of table pagination.
+- [x] Define timestamp semantics, time buckets, filter behavior, empty states, and treatment of unknown resource types.
+- [x] Render responsive charts for resource types and daily observations in the dashboard.
 - Keep provider status separate from analyst triage status.
 - Define a documented local priority rule if the UI needs severity-like prioritization; do not invent provider severity.
+
+The first implementation uses the existing synthetic severity field for the dashboard. Before importing Access Analyzer records, define and label any local priority mapping separately from provider-owned fields.
 
 ### 2. Region data model and map
 

@@ -1,0 +1,30 @@
+# Resolved from .[production] with existing requirements.lock constraints on 2026-11-02.
+# Install this complete runtime lock, then the local package wheel with --no-deps.
+Flask==3.1.3
+Flask-Login==0.6.3
+Flask-Migrate==4.1.0
+Flask-SQLAlchemy==3.1.1
+Flask-Session==0.8.0
+Flask-WTF==1.3.0
+Jinja2==3.1.6
+Mako==1.4.3
+MarkupSafe==3.0.4
+SQLAlchemy==2.1.6
+WTForms==3.3.1
+Werkzeug==3.1.9
+alembic==1.20.1
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+blinker==1.9.0
+cachelib==0.17.0
+cffi==2.1.1
+click==8.5.0
+gunicorn==26.2.0
+itsdangerous==2.2.0
+msgspec==0.22.0
+psycopg==3.3.6
+psycopg-binary==3.3.6
+pycparser==3.12
+python-dotenv==1.2.2
+typing_extensions==4.16.0
+tzdata==2026.5
