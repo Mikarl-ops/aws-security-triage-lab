@@ -105,6 +105,16 @@ export function FindingDetails({
                     <dt>Observed</dt>
                     <dd>{formatDate(finding.observed_at)}</dd>
                   </div>
+                  <div>
+                    <dt>Resource location</dt>
+                    <dd>
+                      {finding.resource_location.scope === "region"
+                        ? `${finding.resource_location.region} Region`
+                        : finding.resource_location.scope === "global"
+                          ? "Global AWS resource"
+                          : "Unknown"}
+                    </dd>
+                  </div>
                   {finding.source_event_id && (
                     <div>
                       <dt>Source event</dt>

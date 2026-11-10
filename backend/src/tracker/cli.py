@@ -15,6 +15,7 @@ from .models import Finding, User
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 SOURCE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+REGION_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$")
 SEED_FIELDS = {
     "source",
     "source_event_id",
@@ -22,12 +23,14 @@ SEED_FIELDS = {
     "description",
     "evidence_summary",
     "metadata",
+    "resource_location",
     "severity",
     "status",
     "observed_at",
     "resolution_reason",
 }
-SEED_METADATA_FIELDS = {"region", "account_id", "resource_id", "resource_type", "event_name"}
+SEED_METADATA_FIELDS = {"account_id", "resource_id", "resource_type", "event_name"}
+RESOURCE_LOCATION_SCOPES = {"region", "global", "unknown"}
 SEVERITIES = {"critical", "high", "medium", "low", "informational"}
 STATUSES = {"new", "investigating", "resolved", "dismissed"}
 
@@ -91,6 +94,20 @@ def _validated_seed_records(path: Path) -> list[dict]:
             raise click.ClickException(f"{prefix} metadata contains unsupported fields.")
         if any(not isinstance(value, (str, int, float, bool)) for value in metadata.values()):
             raise click.ClickException(f"{prefix} metadata values must be scalar.")
+        location = record["resource_location"]
+        if not isinstance(location, dict) or set(location) != {"scope", "region"}:
+            raise click.ClickException(f"{prefix} resource_location must contain scope and region.")
+        scope = location["scope"]
+        region = location["region"]
+        if not isinstance(scope, str) or scope not in RESOURCE_LOCATION_SCOPES:
+            raise click.ClickException(f"{prefix} has an unsupported resource location scope.")
+        if scope == "region":
+            if not isinstance(region, str) or not REGION_PATTERN.fullmatch(region):
+                raise click.ClickException(f"{prefix} needs a valid AWS Region code.")
+        elif region is not None:
+            raise click.ClickException(
+                f"{prefix} must set resource_location.region to null outside the region scope."
+            )
         reason = record["resolution_reason"]
         if record["status"] in {"resolved", "dismissed"}:
             if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
@@ -102,6 +119,8 @@ def _validated_seed_records(path: Path) -> list[dict]:
                 **record,
                 "observed_at": observed_at.astimezone(UTC),
                 "metadata_json": metadata,
+                "resource_location_scope": scope,
+                "resource_region": region,
             }
         )
     return validated
@@ -138,9 +157,11 @@ def register_commands(app) -> None:
                         **{
                             key: value
                             for key, value in record.items()
-                            if key in SEED_FIELDS - {"metadata"}
+                            if key in SEED_FIELDS - {"metadata", "resource_location"}
                         },
                         metadata_json=record["metadata_json"],
+                        resource_location_scope=record["resource_location_scope"],
+                        resource_region=record["resource_region"],
                     )
                 )
                 added += 1

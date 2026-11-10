@@ -2,6 +2,10 @@ export type FindingStatus = "new" | "investigating" | "resolved" | "dismissed";
 
 export type FindingSeverity = "critical" | "high" | "medium" | "low" | "informational";
 
+export type ResourceLocation =
+  | { scope: "region"; region: string }
+  | { scope: "global" | "unknown"; region: null };
+
 export interface Finding {
   id: string;
   title: string;
@@ -14,6 +18,7 @@ export interface Finding {
   description: string;
   source_event_id: string | null;
   evidence_summary: string;
+  resource_location: ResourceLocation;
   metadata: Record<string, string | number | boolean>;
   resolution_reason: string | null;
   created_at: string;

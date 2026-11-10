@@ -50,6 +50,8 @@ Abbreviated example response shape (the returned daily bucket list contains 30 e
 
 The example is illustrative. `by_observed_day` always contains one entry for each date in the returned window, with zeroes for dates that have no matching findings. Resource types that are missing, blank, or longer than 128 characters are grouped as `Unknown`. The dashboard shows the six most frequent resource types and combines any remainder under “Other resource types.”
 
+Finding detail responses include `resource_location` as a separate value with `scope` set to `region`, `global`, or `unknown`. `region` is populated only for the `region` scope. For example, `{"resource_location":{"scope":"region","region":"ap-southeast-2"}}` describes a regional resource, while global or unknown locations return a null region. Legacy `metadata.region` values are not used to infer resource location because they may describe an event or source context.
+
 ## Analyst actions
 
 Status changes require the analyst role and an `expected_version`, and are written with an audit event. Notes also require the analyst role and create an audit event. Viewers can read findings but cannot change them. API error responses use a consistent problem shape and avoid returning internal exception details.

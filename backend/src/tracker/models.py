@@ -62,6 +62,15 @@ class Finding(db.Model):
             "status IN ('new', 'investigating', 'resolved', 'dismissed')", name="valid_status"
         ),
         CheckConstraint("version > 0", name="positive_version"),
+        CheckConstraint(
+            "resource_location_scope IN ('region', 'global', 'unknown')",
+            name="valid_resource_location_scope",
+        ),
+        CheckConstraint(
+            "(resource_location_scope = 'region' AND resource_region IS NOT NULL) OR "
+            "(resource_location_scope IN ('global', 'unknown') AND resource_region IS NULL)",
+            name="consistent_resource_location",
+        ),
         UniqueConstraint("source", "source_event_id", name="uq_findings_source_event"),
         Index(
             "ix_findings_status_severity_observed_id",
@@ -83,6 +92,10 @@ class Finding(db.Model):
     )
     severity = db.Column(String(16), nullable=False)
     status = db.Column(String(16), nullable=False, default="new", server_default="new")
+    resource_location_scope = db.Column(
+        String(16), nullable=False, default="unknown", server_default="unknown"
+    )
+    resource_region = db.Column(String(32), nullable=True)
     observed_at = db.Column(db.DateTime(timezone=True), nullable=False)
     resolution_reason = db.Column(String(1000), nullable=True)
     created_at = db.Column(

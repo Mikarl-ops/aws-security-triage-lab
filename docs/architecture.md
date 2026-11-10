@@ -8,6 +8,8 @@ The repository contains a React and TypeScript dashboard and its own Flask/Postg
 
 The analytics endpoint applies the selected status, severity, and source filters to the full set of findings observed in the last 30 UTC calendar days. It returns resource-type counts and one daily bucket per UTC date, including dates with zero findings. The table's page and page size do not affect aggregates.
 
+Findings store resource placement in typed `resource_location_scope` and `resource_region` fields. A legacy `metadata.region` is not treated as resource location; migrated records with ambiguous legacy values remain `unknown`. This keeps an event or source-IP Region separate from the affected resource's placement.
+
 ## Intended local pilot
 
 ```mermaid

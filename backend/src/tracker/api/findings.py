@@ -17,7 +17,7 @@ from .common import iso_utc, json_object, pagination, parse_page_args, parse_rfc
 bp = Blueprint("findings", __name__, url_prefix="/api/v1")
 STATUSES = ("new", "investigating", "resolved", "dismissed")
 SEVERITIES = ("critical", "high", "medium", "low", "informational")
-ALLOWED_METADATA = {"region", "account_id", "resource_id", "resource_type", "event_name"}
+ALLOWED_METADATA = {"account_id", "resource_id", "resource_type", "event_name"}
 SOURCE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 TRANSITIONS = {
     "new": {"investigating", "dismissed"},
@@ -44,6 +44,10 @@ def _finding_json(finding: Finding, *, include_detail: bool = False) -> dict:
                 "description": finding.description,
                 "source_event_id": finding.source_event_id,
                 "evidence_summary": finding.evidence_summary,
+                "resource_location": {
+                    "scope": finding.resource_location_scope,
+                    "region": finding.resource_region,
+                },
                 "metadata": {
                     key: value
                     for key, value in (
