@@ -1,1 +1,1 @@
-"""Read-only provider adapters and offline import previews."""
+"""Provider adapters, offline previews, and synthetic persistence."""

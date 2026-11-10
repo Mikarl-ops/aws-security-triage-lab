@@ -70,6 +70,16 @@ class AccessAnalyzerPreview:
     by_location_scope: dict[str, int]
 
 
+@dataclass(frozen=True)
+class AccessAnalyzerCandidateBatch:
+    candidates: tuple[AccessAnalyzerCandidate, ...]
+    pages_read: int
+    records_read: int
+    invalid_records: int
+    duplicate_records: int
+    truncated: bool
+
+
 class FindingValidationError(ValueError):
     """A provider record failed the importer allowlist and shape checks."""
 
@@ -241,7 +251,7 @@ def _resource_location(resource_type: str, resource_arn: Any) -> tuple[str, str 
     if len(parts) != 6:
         return "unknown", None
     region = parts[3]
-    if not region or not REGION_CODE_PATTERN.fullmatch(region):
+    if not region or len(region) > 32 or not REGION_CODE_PATTERN.fullmatch(region):
         return "unknown", None
     return "region", region
 
@@ -304,9 +314,9 @@ def run_access_analyzer_preview(
     max_findings: int = 500,
     max_pages: int = 20,
 ) -> AccessAnalyzerPreview:
-    analyzer_arn = validate_analyzer_arn(analyzer_arn)
-    bounded_read = read_findings_bounded(
+    batch = collect_access_analyzer_candidates(
         source,
+        analyzer_arn=analyzer_arn,
         page_size=page_size,
         max_findings=max_findings,
         max_pages=max_pages,
@@ -315,6 +325,44 @@ def run_access_analyzer_preview(
     provider_statuses: Counter[str] = Counter()
     priorities: Counter[str] = Counter()
     location_scopes: Counter[str] = Counter()
+
+    for candidate in batch.candidates:
+        resource_types[candidate.resource_type] += 1
+        provider_statuses[candidate.provider_status] += 1
+        priorities[candidate.local_priority] += 1
+        location_scopes[candidate.resource_location_scope] += 1
+
+    return AccessAnalyzerPreview(
+        pages_read=batch.pages_read,
+        records_read=batch.records_read,
+        valid_records=len(batch.candidates),
+        invalid_records=batch.invalid_records,
+        duplicate_records=batch.duplicate_records,
+        truncated=batch.truncated,
+        writes_performed=0,
+        by_resource_type=dict(sorted(resource_types.items())),
+        by_provider_status=dict(sorted(provider_statuses.items())),
+        by_local_priority=dict(sorted(priorities.items())),
+        by_location_scope=dict(sorted(location_scopes.items())),
+    )
+
+
+def collect_access_analyzer_candidates(
+    source: AccessAnalyzerPageSource,
+    *,
+    analyzer_arn: str,
+    page_size: int = 100,
+    max_findings: int = 500,
+    max_pages: int = 20,
+) -> AccessAnalyzerCandidateBatch:
+    analyzer_arn = validate_analyzer_arn(analyzer_arn)
+    bounded_read = read_findings_bounded(
+        source,
+        page_size=page_size,
+        max_findings=max_findings,
+        max_pages=max_pages,
+    )
+    candidates: list[AccessAnalyzerCandidate] = []
     provider_keys: set[str] = set()
     invalid_records = 0
     duplicate_records = 0
@@ -329,21 +377,13 @@ def run_access_analyzer_preview(
             duplicate_records += 1
             continue
         provider_keys.add(candidate.provider_key)
-        resource_types[candidate.resource_type] += 1
-        provider_statuses[candidate.provider_status] += 1
-        priorities[candidate.local_priority] += 1
-        location_scopes[candidate.resource_location_scope] += 1
+        candidates.append(candidate)
 
-    return AccessAnalyzerPreview(
+    return AccessAnalyzerCandidateBatch(
+        candidates=tuple(candidates),
         pages_read=bounded_read.pages_read,
         records_read=len(bounded_read.findings),
-        valid_records=len(provider_keys),
         invalid_records=invalid_records,
         duplicate_records=duplicate_records,
         truncated=bounded_read.truncated,
-        writes_performed=0,
-        by_resource_type=dict(sorted(resource_types.items())),
-        by_provider_status=dict(sorted(provider_statuses.items())),
-        by_local_priority=dict(sorted(priorities.items())),
-        by_location_scope=dict(sorted(location_scopes.items())),
     )

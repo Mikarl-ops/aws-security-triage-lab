@@ -9,7 +9,9 @@ from pathlib import Path
 
 import click
 from argon2 import PasswordHasher
+from flask import current_app
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 
 from .extensions import db
 from .importers.access_analyzer import (
@@ -19,6 +21,10 @@ from .importers.access_analyzer import (
     FixtureAccessAnalyzerPageSource,
     ImportSourceError,
     run_access_analyzer_preview,
+)
+from .importers.access_analyzer_store import (
+    ImportPersistenceError,
+    import_access_analyzer_fixture,
 )
 from .models import Finding, User
 
@@ -58,6 +64,28 @@ def _access_analyzer_fixture_file() -> Path:
         / "seed"
         / "access-analyzer-findings.json"
     )
+
+
+def _require_local_development_database() -> None:
+    if current_app.config.get("APP_ENV") != "development":
+        raise click.ClickException(
+            "The synthetic fixture import is available only in the development environment."
+        )
+    try:
+        database_url = make_url(current_app.config["SQLALCHEMY_DATABASE_URI"])
+    except Exception:
+        raise click.ClickException(
+            "The synthetic fixture import requires a local development database."
+        ) from None
+    local_hosts = {"127.0.0.1", "localhost", "::1", "db"}
+    if (
+        database_url.drivername not in {"postgresql", "postgresql+psycopg"}
+        or database_url.host not in local_hosts
+    ):
+        raise click.ClickException(
+            "The synthetic fixture import requires PostgreSQL on loopback or the local "
+            "Compose service."
+        )
 
 
 def _validated_seed_records(path: Path) -> list[dict]:
@@ -230,6 +258,53 @@ def register_commands(app) -> None:
                 max_pages=max_pages,
             )
         except (ImportSourceError, ValueError) as error:
+            raise click.ClickException(str(error)) from None
+        click.echo(json.dumps(asdict(result), indent=2, sort_keys=True))
+
+    @app.cli.command("access-analyzer-import-fixture")
+    @click.option(
+        "--confirm-synthetic",
+        is_flag=True,
+        help="Confirm writing the committed synthetic fixture to the local development database.",
+    )
+    @click.option(
+        "--page-size",
+        type=click.IntRange(1, MAX_PAGE_SIZE),
+        default=2,
+        show_default=True,
+    )
+    @click.option(
+        "--max-findings",
+        type=click.IntRange(1, MAX_FINDINGS_PER_RUN),
+        default=500,
+        show_default=True,
+    )
+    @click.option(
+        "--max-pages",
+        type=click.IntRange(1, MAX_PAGES_PER_RUN),
+        default=20,
+        show_default=True,
+    )
+    def access_analyzer_import_fixture(
+        confirm_synthetic: bool, page_size: int, max_findings: int, max_pages: int
+    ) -> None:
+        """Persist only the committed synthetic fixture into a local development database."""
+        if not confirm_synthetic:
+            raise click.ClickException(
+                "Pass --confirm-synthetic to write the committed fabricated findings."
+            )
+        _require_local_development_database()
+        try:
+            source = FixtureAccessAnalyzerPageSource.from_file(_access_analyzer_fixture_file())
+            result = import_access_analyzer_fixture(
+                db.session,
+                source,
+                analyzer_arn=source.analyzer_arn,
+                page_size=page_size,
+                max_findings=max_findings,
+                max_pages=max_pages,
+            )
+        except (ImportPersistenceError, ImportSourceError, ValueError) as error:
             raise click.ClickException(str(error)) from None
         click.echo(json.dumps(asdict(result), indent=2, sort_keys=True))
 
