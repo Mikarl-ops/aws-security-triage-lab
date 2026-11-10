@@ -3,18 +3,34 @@
 import json
 import os
 import re
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 import click
 from argon2 import PasswordHasher
+from flask import current_app
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 
 from .extensions import db
+from .importers.access_analyzer import (
+    MAX_FINDINGS_PER_RUN,
+    MAX_PAGE_SIZE,
+    MAX_PAGES_PER_RUN,
+    FixtureAccessAnalyzerPageSource,
+    ImportSourceError,
+    run_access_analyzer_preview,
+)
+from .importers.access_analyzer_store import (
+    ImportPersistenceError,
+    import_access_analyzer_fixture,
+)
 from .models import Finding, User
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 SOURCE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+REGION_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$")
 SEED_FIELDS = {
     "source",
     "source_event_id",
@@ -22,12 +38,14 @@ SEED_FIELDS = {
     "description",
     "evidence_summary",
     "metadata",
+    "resource_location",
     "severity",
     "status",
     "observed_at",
     "resolution_reason",
 }
-SEED_METADATA_FIELDS = {"region", "account_id", "resource_id", "resource_type", "event_name"}
+SEED_METADATA_FIELDS = {"account_id", "resource_id", "resource_type", "event_name"}
+RESOURCE_LOCATION_SCOPES = {"region", "global", "unknown"}
 SEVERITIES = {"critical", "high", "medium", "low", "informational"}
 STATUSES = {"new", "investigating", "resolved", "dismissed"}
 
@@ -37,6 +55,37 @@ def _seed_file() -> Path:
     if configured_path:
         return Path(configured_path)
     return Path(__file__).resolve().parents[3] / "database" / "seed" / "findings.json"
+
+
+def _access_analyzer_fixture_file() -> Path:
+    return (
+        Path(__file__).resolve().parents[3]
+        / "database"
+        / "seed"
+        / "access-analyzer-findings.json"
+    )
+
+
+def _require_local_development_database() -> None:
+    if current_app.config.get("APP_ENV") != "development":
+        raise click.ClickException(
+            "The synthetic fixture import is available only in the development environment."
+        )
+    try:
+        database_url = make_url(current_app.config["SQLALCHEMY_DATABASE_URI"])
+    except Exception:
+        raise click.ClickException(
+            "The synthetic fixture import requires a local development database."
+        ) from None
+    local_hosts = {"127.0.0.1", "localhost", "::1", "db"}
+    if (
+        database_url.drivername not in {"postgresql", "postgresql+psycopg"}
+        or database_url.host not in local_hosts
+    ):
+        raise click.ClickException(
+            "The synthetic fixture import requires PostgreSQL on loopback or the local "
+            "Compose service."
+        )
 
 
 def _validated_seed_records(path: Path) -> list[dict]:
@@ -91,6 +140,20 @@ def _validated_seed_records(path: Path) -> list[dict]:
             raise click.ClickException(f"{prefix} metadata contains unsupported fields.")
         if any(not isinstance(value, (str, int, float, bool)) for value in metadata.values()):
             raise click.ClickException(f"{prefix} metadata values must be scalar.")
+        location = record["resource_location"]
+        if not isinstance(location, dict) or set(location) != {"scope", "region"}:
+            raise click.ClickException(f"{prefix} resource_location must contain scope and region.")
+        scope = location["scope"]
+        region = location["region"]
+        if not isinstance(scope, str) or scope not in RESOURCE_LOCATION_SCOPES:
+            raise click.ClickException(f"{prefix} has an unsupported resource location scope.")
+        if scope == "region":
+            if not isinstance(region, str) or not REGION_PATTERN.fullmatch(region):
+                raise click.ClickException(f"{prefix} needs a valid AWS Region code.")
+        elif region is not None:
+            raise click.ClickException(
+                f"{prefix} must set resource_location.region to null outside the region scope."
+            )
         reason = record["resolution_reason"]
         if record["status"] in {"resolved", "dismissed"}:
             if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
@@ -102,6 +165,8 @@ def _validated_seed_records(path: Path) -> list[dict]:
                 **record,
                 "observed_at": observed_at.astimezone(UTC),
                 "metadata_json": metadata,
+                "resource_location_scope": scope,
+                "resource_region": region,
             }
         )
     return validated
@@ -138,9 +203,11 @@ def register_commands(app) -> None:
                         **{
                             key: value
                             for key, value in record.items()
-                            if key in SEED_FIELDS - {"metadata"}
+                            if key in SEED_FIELDS - {"metadata", "resource_location"}
                         },
                         metadata_json=record["metadata_json"],
+                        resource_location_scope=record["resource_location_scope"],
+                        resource_region=record["resource_region"],
                     )
                 )
                 added += 1
@@ -149,6 +216,97 @@ def register_commands(app) -> None:
             db.session.rollback()
             raise click.ClickException("Synthetic findings could not be seeded.") from error
         click.echo(f"Synthetic findings: {added} added, {skipped} already present.")
+
+    @app.cli.command("access-analyzer-preview")
+    @click.option(
+        "--fixture",
+        "fixture_file",
+        type=click.Path(path_type=Path, exists=True, dir_okay=False),
+        default=None,
+        help="Synthetic Access Analyzer fixture file.",
+    )
+    @click.option(
+        "--page-size",
+        type=click.IntRange(1, MAX_PAGE_SIZE),
+        default=2,
+        show_default=True,
+    )
+    @click.option(
+        "--max-findings",
+        type=click.IntRange(1, MAX_FINDINGS_PER_RUN),
+        default=500,
+        show_default=True,
+    )
+    @click.option(
+        "--max-pages",
+        type=click.IntRange(1, MAX_PAGES_PER_RUN),
+        default=20,
+        show_default=True,
+    )
+    def access_analyzer_preview(
+        fixture_file: Path | None, page_size: int, max_findings: int, max_pages: int
+    ) -> None:
+        """Summarize synthetic Access Analyzer findings without AWS or database writes."""
+        path = fixture_file or _access_analyzer_fixture_file()
+        try:
+            source = FixtureAccessAnalyzerPageSource.from_file(path)
+            result = run_access_analyzer_preview(
+                source,
+                analyzer_arn=source.analyzer_arn,
+                page_size=page_size,
+                max_findings=max_findings,
+                max_pages=max_pages,
+            )
+        except (ImportSourceError, ValueError) as error:
+            raise click.ClickException(str(error)) from None
+        click.echo(json.dumps(asdict(result), indent=2, sort_keys=True))
+
+    @app.cli.command("access-analyzer-import-fixture")
+    @click.option(
+        "--confirm-synthetic",
+        is_flag=True,
+        help="Confirm writing the committed synthetic fixture to the local development database.",
+    )
+    @click.option(
+        "--page-size",
+        type=click.IntRange(1, MAX_PAGE_SIZE),
+        default=2,
+        show_default=True,
+    )
+    @click.option(
+        "--max-findings",
+        type=click.IntRange(1, MAX_FINDINGS_PER_RUN),
+        default=500,
+        show_default=True,
+    )
+    @click.option(
+        "--max-pages",
+        type=click.IntRange(1, MAX_PAGES_PER_RUN),
+        default=20,
+        show_default=True,
+    )
+    def access_analyzer_import_fixture(
+        confirm_synthetic: bool, page_size: int, max_findings: int, max_pages: int
+    ) -> None:
+        """Persist only the committed synthetic fixture into a local development database."""
+        if not confirm_synthetic:
+            raise click.ClickException(
+                "Pass --confirm-synthetic to write the committed fabricated findings."
+            )
+        _require_local_development_database()
+        try:
+            source = FixtureAccessAnalyzerPageSource.from_file(_access_analyzer_fixture_file())
+            result = import_access_analyzer_fixture(
+                db.session,
+                source,
+                analyzer_arn=source.analyzer_arn,
+                page_size=page_size,
+                max_findings=max_findings,
+                max_pages=max_pages,
+            )
+        except (ImportPersistenceError, ImportSourceError, ValueError) as error:
+            raise click.ClickException(str(error)) from None
+        click.echo(json.dumps(asdict(result), indent=2, sort_keys=True))
 
     @app.cli.command("create-user")
     @click.argument("username")

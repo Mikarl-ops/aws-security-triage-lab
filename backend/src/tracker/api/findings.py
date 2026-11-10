@@ -17,7 +17,7 @@ from .common import iso_utc, json_object, pagination, parse_page_args, parse_rfc
 bp = Blueprint("findings", __name__, url_prefix="/api/v1")
 STATUSES = ("new", "investigating", "resolved", "dismissed")
 SEVERITIES = ("critical", "high", "medium", "low", "informational")
-ALLOWED_METADATA = {"region", "account_id", "resource_id", "resource_type", "event_name"}
+ALLOWED_METADATA = {"account_id", "resource_id", "resource_type", "event_name"}
 SOURCE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 TRANSITIONS = {
     "new": {"investigating", "dismissed"},
@@ -44,6 +44,21 @@ def _finding_json(finding: Finding, *, include_detail: bool = False) -> dict:
                 "description": finding.description,
                 "source_event_id": finding.source_event_id,
                 "evidence_summary": finding.evidence_summary,
+                "resource_location": {
+                    "scope": finding.resource_location_scope,
+                    "region": finding.resource_region,
+                },
+                "provider": (
+                    {
+                        "status": finding.provider_status,
+                        "is_public": finding.provider_is_public,
+                        "created_at": iso_utc(finding.provider_created_at),
+                        "updated_at": iso_utc(finding.provider_updated_at),
+                        "analyzed_at": iso_utc(finding.provider_analyzed_at),
+                    }
+                    if finding.provider_status is not None
+                    else None
+                ),
                 "metadata": {
                     key: value
                     for key, value in (
@@ -182,6 +197,20 @@ def _utc_day_expression():
     return func.date(Finding.observed_at)
 
 
+def _analytics_window():
+    today = datetime.now(UTC).date()
+    start_day = today - timedelta(days=29)
+    start_at = datetime.combine(start_day, time.min, UTC)
+    end_at = datetime.combine(today + timedelta(days=1), time.min, UTC)
+    window = {
+        "days": 30,
+        "start": start_day.isoformat(),
+        "end": today.isoformat(),
+        "timezone": "UTC",
+    }
+    return start_day, today, start_at, end_at, window
+
+
 def _page_response(filters, page: int, page_size: int):
     total = db.session.scalar(select(func.count()).select_from(Finding).where(*filters)) or 0
     offset = (page - 1) * page_size
@@ -224,10 +253,7 @@ def analytics():
     if error:
         return error
 
-    today = datetime.now(UTC).date()
-    start_day = today - timedelta(days=29)
-    start_at = datetime.combine(start_day, time.min, UTC)
-    end_at = datetime.combine(today + timedelta(days=1), time.min, UTC)
+    start_day, _today, start_at, end_at, window = _analytics_window()
     scoped_filters = [*filters, Finding.observed_at >= start_at, Finding.observed_at < end_at]
 
     raw_resource_type = Finding.metadata_json["resource_type"].as_string()
@@ -265,7 +291,7 @@ def analytics():
             day_counts[day_value] = count
 
     return jsonify(
-        window={"days": 30, "start": start_day.isoformat(), "end": today.isoformat(), "timezone": "UTC"},
+        window=window,
         total=total,
         by_resource_type=[
             {"resource_type": label, "count": count} for label, count in resource_rows
@@ -273,6 +299,40 @@ def analytics():
         by_observed_day=[
             {"day": day.isoformat(), "count": count} for day, count in day_counts.items()
         ],
+    )
+
+
+@bp.get("/findings/region-analytics")
+@login_required
+def region_analytics():
+    filters, error = _parse_analytics_filters()
+    if error:
+        return error
+
+    _start_day, _today, start_at, end_at, window = _analytics_window()
+    scoped_filters = [*filters, Finding.observed_at >= start_at, Finding.observed_at < end_at]
+    region_rows = db.session.execute(
+        select(Finding.resource_region.label("region"), func.count().label("count"))
+        .where(*scoped_filters, Finding.resource_location_scope == "region")
+        .group_by(Finding.resource_region)
+        .order_by(func.count().desc(), Finding.resource_region.asc())
+    ).all()
+    scope_rows = db.session.execute(
+        select(Finding.resource_location_scope, func.count())
+        .where(*scoped_filters)
+        .group_by(Finding.resource_location_scope)
+    ).all()
+    by_scope = {"region": 0, "global": 0, "unknown": 0}
+    by_scope.update({scope: count for scope, count in scope_rows})
+    total = db.session.scalar(
+        select(func.count()).select_from(Finding).where(*scoped_filters)
+    ) or 0
+
+    return jsonify(
+        window=window,
+        total=total,
+        by_region=[{"region": region, "count": count} for region, count in region_rows],
+        by_scope=by_scope,
     )
 
 

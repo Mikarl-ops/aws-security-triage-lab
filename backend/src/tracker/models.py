@@ -62,6 +62,28 @@ class Finding(db.Model):
             "status IN ('new', 'investigating', 'resolved', 'dismissed')", name="valid_status"
         ),
         CheckConstraint("version > 0", name="positive_version"),
+        CheckConstraint(
+            "resource_location_scope IN ('region', 'global', 'unknown')",
+            name="valid_resource_location_scope",
+        ),
+        CheckConstraint(
+            "(resource_location_scope = 'region' AND resource_region IS NOT NULL) OR "
+            "(resource_location_scope IN ('global', 'unknown') AND resource_region IS NULL)",
+            name="consistent_resource_location",
+        ),
+        CheckConstraint(
+            "provider_status IS NULL OR provider_status IN ('ACTIVE', 'ARCHIVED', 'RESOLVED')",
+            name="valid_provider_status",
+        ),
+        CheckConstraint(
+            "(provider_status IS NULL AND provider_is_public IS NULL AND "
+            "provider_created_at IS NULL AND provider_updated_at IS NULL AND "
+            "provider_analyzed_at IS NULL) OR "
+            "(provider_status IS NOT NULL AND provider_is_public IS NOT NULL AND "
+            "provider_created_at IS NOT NULL AND provider_updated_at IS NOT NULL AND "
+            "provider_analyzed_at IS NOT NULL)",
+            name="consistent_provider_fields",
+        ),
         UniqueConstraint("source", "source_event_id", name="uq_findings_source_event"),
         Index(
             "ix_findings_status_severity_observed_id",
@@ -83,6 +105,15 @@ class Finding(db.Model):
     )
     severity = db.Column(String(16), nullable=False)
     status = db.Column(String(16), nullable=False, default="new", server_default="new")
+    resource_location_scope = db.Column(
+        String(16), nullable=False, default="unknown", server_default="unknown"
+    )
+    resource_region = db.Column(String(32), nullable=True)
+    provider_status = db.Column(String(16), nullable=True)
+    provider_is_public = db.Column(db.Boolean, nullable=True)
+    provider_created_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    provider_updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    provider_analyzed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     observed_at = db.Column(db.DateTime(timezone=True), nullable=False)
     resolution_reason = db.Column(String(1000), nullable=True)
     created_at = db.Column(

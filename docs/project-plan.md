@@ -32,18 +32,22 @@ The first implementation uses the existing synthetic severity field for the dash
 
 ### 2. Region data model and map
 
-- Model resource location explicitly as an AWS Region, global, or unknown.
-- Keep source-IP geolocation separate from resource location.
-- Add a Region map after the data model can express those distinctions reliably.
+- [x] Model resource location explicitly as an AWS Region, global, or unknown.
+- [x] Keep source-IP geography separate from resource location.
+- [x] Add a Region map after the data model can express those distinctions reliably.
+
+The map plots approximate positions for supported Region codes. Other codes remain visible in the count list without a plotted marker. Global and unknown findings have separate counts and are never assigned map coordinates.
 
 ### 3. Read-only importer foundation
 
-- Implement a provider adapter with a single configured analyzer, bounded pagination, and a maximum batch size.
-- Allowlist fields before persistence; keep raw provider payloads out of ordinary logs and public artifacts.
-- Build a stable provider key scoped to its analyzer and make repeated imports idempotent.
-- Include dry-run aggregate counts and clear handling for empty pages, malformed records, and access errors.
-- On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
-- Use fabricated fixtures for pagination, deduplication, update, and failure scenarios.
+- [x] Implement an injected provider adapter for a configured analyzer, with bounded pagination and a maximum batch size.
+- [x] Normalize an allowlist of provider fields for a synthetic dry run; keep raw provider payloads out of ordinary logs and public artifacts.
+- [x] Build and persist a stable provider key scoped to its analyzer for idempotent imports.
+- [x] Include synthetic dry-run aggregate counts and bounded handling for malformed records and pagination errors.
+- [x] Make repeated synthetic fixture imports idempotent and preserve analyst-owned fields.
+- [ ] Enable a real AWS client only after the account, Region, exact fields, access list, retention period, and purge date are explicitly approved.
+- [x] On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
+- [ ] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
 
 ### 4. Controlled live pilot
 

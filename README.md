@@ -4,16 +4,16 @@ A local-first project for exploring how AWS security findings can enter an analy
 
 ## Current state
 
-- The repository has a responsive React and TypeScript dashboard baseline.
+- The repository has a responsive React and TypeScript dashboard with findings charts and a Region map.
 - The dashboard and this repository's Flask/PostgreSQL API use synthetic findings.
-- The API includes session-based analyst/viewer roles, notes, audit history, and a filtered analytics endpoint.
-- This repository does not yet contain an AWS importer or a live AWS connection.
+- The API includes session-based analyst/viewer roles, notes, audit history, and filtered analytics endpoints.
+- The importer supports a bounded synthetic preview and a confirmed local fixture import; no live AWS connection is available.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.
 
 ## Project direction
 
-The first application slice is server-backed analytics: findings by resource type and findings over time. The charts use the last 30 UTC calendar days and aggregate every matching finding, independent of table pagination. A Region map can follow once resource location is modeled as regional, global, or unknown. Source-IP geography is a separate concept and must not be presented as resource location.
+The dashboard shows findings by resource type, findings over time, and resource locations classified as an AWS Region, global, or unknown. Analytics use the last 30 UTC calendar days and aggregate every matching finding, independent of table pagination. The map uses approximate positions for common Region codes; other codes remain in the count list. Source-IP geography is a separate concept and is not presented as resource location. See the [AWS Region reference](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html) for Region codes and geography.
 
 The first AWS source under consideration is IAM Access Analyzer external-access findings. The planned importer is read-only, bounded, idempotent, and uses a field allowlist. It will support a dry run and preserve analyst-owned status, notes, and audit history when provider data changes. A documented local priority rule will be used where triage needs one; provider severity is not assumed.
 
@@ -22,6 +22,7 @@ See the evolving project documents:
 - [Project plan](docs/project-plan.md)
 - [Architecture](docs/architecture.md)
 - [API contract](docs/api-contract.md)
+- [Importer notes](docs/importer.md)
 - [Data handling and authorization](docs/data-handling.md)
 
 ## Preview the dashboard

@@ -15,6 +15,7 @@ COPY backend/src /app/backend/src
 COPY backend/migrations /app/backend/migrations
 COPY backend/start_dev.py /app/backend/start_dev.py
 COPY database/seed/findings.json /app/database/seed/findings.json
+COPY database/seed/access-analyzer-findings.json /app/database/seed/access-analyzer-findings.json
 
 WORKDIR /app/backend
 RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation -e .

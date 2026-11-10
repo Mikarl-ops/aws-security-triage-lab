@@ -3,7 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "./api";
 import { App } from "./App";
 import { demoFindings, demoHistoryByFinding, demoNotesByFinding } from "./demoData";
-import type { AuditEvent, Finding, FindingAnalytics, FindingNote, FindingStatus, FindingSummary, SessionUser } from "./types";
+import type {
+  AuditEvent,
+  Finding,
+  FindingAnalytics,
+  FindingNote,
+  FindingRegionAnalytics,
+  FindingStatus,
+  FindingSummary,
+  SessionUser,
+} from "./types";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -15,6 +24,7 @@ vi.mock("./api", async (importOriginal) => {
       logout: vi.fn(),
       getSummary: vi.fn(),
       getAnalytics: vi.fn(),
+      getRegionAnalytics: vi.fn(),
       listFindings: vi.fn(),
       getFinding: vi.fn(),
       listNotes: vi.fn(),
@@ -95,6 +105,42 @@ beforeEach(() => {
       total: [...dayCounts.values()].reduce((sum, count) => sum + count, 0),
       by_resource_type: [...resourceCounts].map(([resource_type, count]) => ({ resource_type, count })),
       by_observed_day: [...dayCounts].map(([day, count]) => ({ day, count })),
+    };
+    return result;
+  });
+  mockedApi.getRegionAnalytics.mockImplementation(async (filters) => {
+    const matching = serverFindings.filter(
+      (finding) =>
+        (!filters.status || finding.status === filters.status) &&
+        (!filters.severity || finding.severity === filters.severity) &&
+        (!filters.source || finding.source === filters.source),
+    );
+    const today = new Date();
+    const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - 29);
+    const regionalCounts = new Map<string, number>();
+    const by_scope = { region: 0, global: 0, unknown: 0 };
+    for (const finding of matching) {
+      if (finding.observed_at < start.toISOString() || finding.observed_at >= new Date(end.getTime() + 86_400_000).toISOString()) {
+        continue;
+      }
+      by_scope[finding.resource_location.scope] += 1;
+      if (finding.resource_location.scope === "region") {
+        const region = finding.resource_location.region;
+        regionalCounts.set(region, (regionalCounts.get(region) ?? 0) + 1);
+      }
+    }
+    const result: FindingRegionAnalytics = {
+      window: {
+        days: 30,
+        start: start.toISOString().slice(0, 10),
+        end: end.toISOString().slice(0, 10),
+        timezone: "UTC",
+      },
+      total: by_scope.region + by_scope.global + by_scope.unknown,
+      by_region: [...regionalCounts].map(([region, count]) => ({ region, count })),
+      by_scope,
     };
     return result;
   });

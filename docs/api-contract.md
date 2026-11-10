@@ -50,6 +50,14 @@ Abbreviated example response shape (the returned daily bucket list contains 30 e
 
 The example is illustrative. `by_observed_day` always contains one entry for each date in the returned window, with zeroes for dates that have no matching findings. Resource types that are missing, blank, or longer than 128 characters are grouped as `Unknown`. The dashboard shows the six most frequent resource types and combines any remainder under “Other resource types.”
 
+Finding detail responses include `resource_location` as a separate value with `scope` set to `region`, `global`, or `unknown`. `region` is populated only for the `region` scope. For example, `{"resource_location":{"scope":"region","region":"ap-southeast-2"}}` describes a regional resource, while global or unknown locations return a null region. Legacy `metadata.region` values are not used to infer resource location because they may describe an event or source context.
+
+Detail responses include `provider` as null for findings without provider-owned fields. Imported findings return only the allowlisted provider status, public-access flag, and provider creation, update, and analysis timestamps. These fields remain separate from analyst status, resolution reason, notes, and application timestamps.
+
+### `GET /findings/region-analytics`
+
+Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts the same `status`, `severity`, and `source` filters as `/findings/analytics`; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
+
 ## Analyst actions
 
 Status changes require the analyst role and an `expected_version`, and are written with an audit event. Notes also require the analyst role and create an audit event. Viewers can read findings but cannot change them. API error responses use a consistent problem shape and avoid returning internal exception details.
