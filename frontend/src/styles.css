@@ -532,6 +532,66 @@ a {
 .chart-line { fill: none; stroke: var(--mint); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.5; }
 .chart-point { fill: var(--mint); stroke: var(--surface); stroke-width: 2; }
 
+.region-panel {
+  margin: 0 0 18px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--raised) 35%, var(--surface)), var(--surface) 58%);
+}
+
+.region-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.region-panel-heading .eyebrow { margin: 0 0 5px; }
+.region-panel-heading h2 { margin: 0; font-size: 1rem; font-weight: 680; }
+.region-panel-heading p:not(.eyebrow) { margin: 5px 0 0; color: var(--muted); font-size: 0.72rem; }
+.region-total { display: grid; justify-items: end; gap: 4px; }
+.region-total strong { color: var(--mint); font: 650 1.2rem/1 var(--mono); }
+.region-total span { color: var(--muted); font-size: 0.68rem; }
+
+.region-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(190px, 0.7fr);
+  align-items: stretch;
+  gap: 18px;
+}
+
+.world-map-wrap {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #23344a;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at 48% 48%, #14243a, #101a2a 72%);
+}
+
+.world-map { display: block; width: 100%; height: auto; }
+.map-graticule { stroke: #23344a; stroke-width: 1; stroke-dasharray: 2 6; }
+.map-landmass { fill: #1c2c40; stroke: #34485f; stroke-width: 1.1; stroke-linejoin: round; }
+.region-map-marker circle { fill: var(--mint); fill-opacity: 0.85; stroke: #b6ffe9; stroke-width: 1.5; }
+.region-map-marker text { fill: #ecfff8; font: 11px var(--mono); paint-order: stroke; stroke: #111b2b; stroke-linejoin: round; stroke-width: 3px; }
+.map-note { margin: 0; padding: 0 12px 10px; color: var(--muted); font-size: 0.67rem; line-height: 1.4; }
+
+.region-summary { min-width: 0; padding: 2px 1px; }
+.region-scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.region-scope-grid div { display: grid; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: rgb(10 18 29 / 45%); }
+.region-scope-grid span { color: var(--muted); font-size: 0.64rem; }
+.region-scope-grid strong { color: var(--ink); font: 650 0.9rem/1 var(--mono); }
+.region-summary h3 { margin: 17px 0 8px; font-size: 0.75rem; }
+.region-count-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.region-count-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-width: 0; padding: 7px 8px; border-radius: 7px; background: rgb(10 18 29 / 32%); }
+.region-count-list li span { overflow: hidden; color: var(--ink); font: 0.68rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.region-count-list li strong { color: var(--mint); font: 650 0.72rem/1 var(--mono); }
+.region-count-list li small { color: var(--muted); font-size: 0.6rem; }
+.region-list-empty { color: var(--muted); font-size: 0.7rem; line-height: 1.45; }
+.region-message { display: grid; min-height: 180px; margin: 0; place-items: center; color: var(--muted); font-size: 0.8rem; text-align: center; }
+.region-message.error-text { color: var(--red); }
+
 .findings-panel {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -990,6 +1050,11 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
   .resource-chart { gap: 9px; margin-top: 13px; }
   .resource-chart-row { grid-template-columns: minmax(88px, 0.8fr) minmax(40px, 1fr) 24px; gap: 7px; }
   .time-chart { height: 174px; }
+  .region-panel { padding: 12px; }
+  .region-map-layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .region-scope-grid { gap: 5px; }
+  .region-scope-grid div { padding: 7px; }
+  .region-total { align-self: flex-start; }
   .panel-heading, .filter-bar, .table-footer { padding: 10px; }
   .filter-caption, .table-context { display: none; }
   .filter-bar { gap: 6px; }

@@ -10,6 +10,8 @@ The analytics endpoint applies the selected status, severity, and source filters
 
 Findings store resource placement in typed `resource_location_scope` and `resource_region` fields. A legacy `metadata.region` is not treated as resource location; migrated records with ambiguous legacy values remain `unknown`. This keeps an event or source-IP Region separate from the affected resource's placement. A filtered region analytics endpoint reports counts by explicit Region and separate totals for global and unknown locations.
 
+The dashboard plots approximate positions for a curated set of AWS Region codes. Codes without a plotted position remain in the adjacent count list. Global and unknown resources are summarized separately and do not receive coordinates.
+
 ## Intended local pilot
 
 ```mermaid

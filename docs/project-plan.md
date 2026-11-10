@@ -33,8 +33,10 @@ The first implementation uses the existing synthetic severity field for the dash
 ### 2. Region data model and map
 
 - [x] Model resource location explicitly as an AWS Region, global, or unknown.
-- Keep source-IP geolocation separate from resource location.
-- Add a Region map after the data model can express those distinctions reliably.
+- [x] Keep source-IP geography separate from resource location.
+- [x] Add a Region map after the data model can express those distinctions reliably.
+
+The map plots approximate positions for supported Region codes. Other codes remain visible in the count list without a plotted marker. Global and unknown findings have separate counts and are never assigned map coordinates.
 
 ### 3. Read-only importer foundation
 

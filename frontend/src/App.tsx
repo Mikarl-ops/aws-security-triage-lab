@@ -4,12 +4,14 @@ import { AnalyticsCharts } from "./components/AnalyticsCharts";
 import { AuthScreen } from "./components/AuthScreen";
 import { FindingDetails } from "./components/FindingDetails";
 import { FindingsTable, type FindingFiltersView } from "./components/FindingsTable";
+import { RegionsMap } from "./components/RegionsMap";
 import type {
   AuditEvent,
   Finding,
   FindingAnalytics,
   FindingListItem,
   FindingNote,
+  FindingRegionAnalytics,
   FindingStatus,
   FindingSummary,
   SessionUser,
@@ -72,6 +74,9 @@ export function App() {
   const [analytics, setAnalytics] = useState<FindingAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [regionAnalytics, setRegionAnalytics] = useState<FindingRegionAnalytics | null>(null);
+  const [regionAnalyticsLoading, setRegionAnalyticsLoading] = useState(true);
+  const [regionAnalyticsError, setRegionAnalyticsError] = useState<string | null>(null);
   const [findings, setFindings] = useState<FindingListItem[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
@@ -187,6 +192,33 @@ export function App() {
       })
       .finally(() => {
         if (active) setAnalyticsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [analyticsFilters, authState, refreshToken, user]);
+
+  useEffect(() => {
+    if (authState !== "authenticated" || !user) return;
+    let active = true;
+    setRegionAnalyticsLoading(true);
+    setRegionAnalyticsError(null);
+    api.getRegionAnalytics(analyticsFilters)
+      .then((result) => {
+        if (active) setRegionAnalytics(result);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setUser(null);
+          setAuthState("anonymous");
+          setAuthError("Your session has expired. Sign in again to continue.");
+        } else {
+          setRegionAnalyticsError(friendlyError(error));
+        }
+      })
+      .finally(() => {
+        if (active) setRegionAnalyticsLoading(false);
       });
     return () => {
       active = false;
@@ -530,6 +562,11 @@ export function App() {
           </section>
 
           <AnalyticsCharts analytics={analytics} error={analyticsError} loading={analyticsLoading} />
+          <RegionsMap
+            analytics={regionAnalytics}
+            error={regionAnalyticsError}
+            loading={regionAnalyticsLoading}
+          />
 
           <FindingsTable
             error={dashboardError}
