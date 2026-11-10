@@ -52,6 +52,10 @@ The example is illustrative. `by_observed_day` always contains one entry for eac
 
 Finding detail responses include `resource_location` as a separate value with `scope` set to `region`, `global`, or `unknown`. `region` is populated only for the `region` scope. For example, `{"resource_location":{"scope":"region","region":"ap-southeast-2"}}` describes a regional resource, while global or unknown locations return a null region. Legacy `metadata.region` values are not used to infer resource location because they may describe an event or source context.
 
+### `GET /findings/region-analytics`
+
+Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts the same `status`, `severity`, and `source` filters as `/findings/analytics`; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
+
 ## Analyst actions
 
 Status changes require the analyst role and an `expected_version`, and are written with an audit event. Notes also require the analyst role and create an audit event. Viewers can read findings but cannot change them. API error responses use a consistent problem shape and avoid returning internal exception details.

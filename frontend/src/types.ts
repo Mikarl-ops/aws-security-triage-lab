@@ -2,6 +2,8 @@ export type FindingStatus = "new" | "investigating" | "resolved" | "dismissed";
 
 export type FindingSeverity = "critical" | "high" | "medium" | "low" | "informational";
 
+export type ResourceLocationScope = "region" | "global" | "unknown";
+
 export type ResourceLocation =
   | { scope: "region"; region: string }
   | { scope: "global" | "unknown"; region: null };
@@ -53,6 +55,13 @@ export interface FindingAnalytics {
   total: number;
   by_resource_type: Array<{ resource_type: string; count: number }>;
   by_observed_day: Array<{ day: string; count: number }>;
+}
+
+export interface FindingRegionAnalytics {
+  window: FindingAnalytics["window"];
+  total: number;
+  by_region: Array<{ region: string; count: number }>;
+  by_scope: Record<ResourceLocationScope, number>;
 }
 
 export interface FindingNote {

@@ -4,6 +4,7 @@ import type {
   FindingAnalytics,
   FindingListItem,
   FindingNote,
+  FindingRegionAnalytics,
   FindingSeverity,
   FindingStatus,
   FindingSummary,
@@ -110,6 +111,16 @@ export const api = {
     const queryString = params.toString();
     const query = queryString ? `?${queryString}` : "";
     return request<FindingAnalytics>(`/findings/analytics${query}`);
+  },
+
+  getRegionAnalytics(filters: AnalyticsFilters) {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.severity) params.set("severity", filters.severity);
+    if (filters.source) params.set("source", filters.source);
+    const queryString = params.toString();
+    const query = queryString ? `?${queryString}` : "";
+    return request<FindingRegionAnalytics>(`/findings/region-analytics${query}`);
   },
 
   listFindings(filters: FindingFilters) {
