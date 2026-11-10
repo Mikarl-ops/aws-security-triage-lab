@@ -21,4 +21,12 @@ The account command prompts for a password and stores only its Argon2id hash. `G
 
 The Compose API container runs migrations and `seed-demo` at startup. Create a login with `docker compose exec api flask --app tracker:create_app create-user analyst --role analyst`. Sample records are fabricated and can be loaded repeatedly without deleting existing records; see [seed-data conventions](../database/seed/README.md).
 
+Preview the Access Analyzer import shape using only the committed synthetic fixture:
+
+```text
+flask --app tracker:create_app access-analyzer-preview
+```
+
+This command reports aggregate counts, performs no database writes, and makes no AWS calls. See the [importer notes](../docs/importer.md) for the current adapter boundary and field handling.
+
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.

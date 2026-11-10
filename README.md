@@ -7,7 +7,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - The repository has a responsive React and TypeScript dashboard with findings charts and a Region map.
 - The dashboard and this repository's Flask/PostgreSQL API use synthetic findings.
 - The API includes session-based analyst/viewer roles, notes, audit history, and filtered analytics endpoints.
-- This repository does not yet contain an AWS importer or a live AWS connection.
+- The importer is currently a bounded synthetic preview; no live AWS connection is available.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.
 
@@ -22,6 +22,7 @@ See the evolving project documents:
 - [Project plan](docs/project-plan.md)
 - [Architecture](docs/architecture.md)
 - [API contract](docs/api-contract.md)
+- [Importer notes](docs/importer.md)
 - [Data handling and authorization](docs/data-handling.md)
 
 ## Preview the dashboard

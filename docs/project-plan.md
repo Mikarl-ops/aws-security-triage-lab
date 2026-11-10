@@ -40,10 +40,12 @@ The map plots approximate positions for supported Region codes. Other codes rema
 
 ### 3. Read-only importer foundation
 
-- Implement a provider adapter with a single configured analyzer, bounded pagination, and a maximum batch size.
-- Allowlist fields before persistence; keep raw provider payloads out of ordinary logs and public artifacts.
-- Build a stable provider key scoped to its analyzer and make repeated imports idempotent.
-- Include dry-run aggregate counts and clear handling for empty pages, malformed records, and access errors.
+- [x] Implement an injected provider adapter for a configured analyzer, with bounded pagination and a maximum batch size.
+- [x] Normalize an allowlist of provider fields for a synthetic dry run; keep raw provider payloads out of ordinary logs and public artifacts.
+- [x] Build a stable provider key scoped to its analyzer for future idempotent writes; persisted import idempotency remains pending.
+- [x] Include synthetic dry-run aggregate counts and bounded handling for malformed records and pagination errors.
+- [ ] Make repeated persisted imports idempotent and preserve analyst-owned fields.
+- [ ] Enable a real AWS client only after the account, Region, exact fields, access list, retention period, and purge date are explicitly approved.
 - On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
 - Use fabricated fixtures for pagination, deduplication, update, and failure scenarios.
 
