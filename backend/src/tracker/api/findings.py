@@ -48,6 +48,17 @@ def _finding_json(finding: Finding, *, include_detail: bool = False) -> dict:
                     "scope": finding.resource_location_scope,
                     "region": finding.resource_region,
                 },
+                "provider": (
+                    {
+                        "status": finding.provider_status,
+                        "is_public": finding.provider_is_public,
+                        "created_at": iso_utc(finding.provider_created_at),
+                        "updated_at": iso_utc(finding.provider_updated_at),
+                        "analyzed_at": iso_utc(finding.provider_analyzed_at),
+                    }
+                    if finding.provider_status is not None
+                    else None
+                ),
                 "metadata": {
                     key: value
                     for key, value in (
