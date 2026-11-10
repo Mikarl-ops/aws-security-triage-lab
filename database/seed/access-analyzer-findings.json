@@ -1,0 +1,35 @@
+{
+  "analyzer_arn": "arn:aws:access-analyzer:ap-southeast-1:000000000000:analyzer/synthetic-lab",
+  "findings": [
+    {
+      "id": "synthetic-access-analyzer-001",
+      "resourceType": "AWS::S3::Bucket",
+      "resource": "arn:aws:s3:::synthetic-public-bucket",
+      "isPublic": true,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-30T08:00:00Z",
+      "updatedAt": "2026-10-30T09:00:00Z",
+      "analyzedAt": "2026-10-30T09:05:00Z"
+    },
+    {
+      "id": "synthetic-access-analyzer-002",
+      "resourceType": "AWS::IAM::Role",
+      "resource": "arn:aws:iam::000000000000:role/synthetic-review-role",
+      "isPublic": false,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-30T08:10:00Z",
+      "updatedAt": "2026-10-30T09:10:00Z",
+      "analyzedAt": "2026-10-30T09:15:00Z"
+    },
+    {
+      "id": "synthetic-access-analyzer-003",
+      "resourceType": "AWS::EC2::Snapshot",
+      "resource": "arn:aws:ec2:us-west-2:000000000000:snapshot/snap-synthetic-003",
+      "isPublic": false,
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-30T08:20:00Z",
+      "updatedAt": "2026-10-30T09:20:00Z",
+      "analyzedAt": "2026-10-30T09:25:00Z"
+    }
+  ]
+}
