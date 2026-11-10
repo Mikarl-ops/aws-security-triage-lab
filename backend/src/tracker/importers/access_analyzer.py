@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -35,6 +38,40 @@ class BoundedFindingRead:
     findings: tuple[Any, ...]
     pages_read: int
     truncated: bool
+
+
+@dataclass(frozen=True)
+class AccessAnalyzerCandidate:
+    provider_key: str
+    resource_type: str
+    provider_status: str
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+    analyzed_at: datetime
+    observed_at: datetime
+    local_priority: str
+    resource_location_scope: str
+    resource_region: str | None
+
+
+@dataclass(frozen=True)
+class AccessAnalyzerPreview:
+    pages_read: int
+    records_read: int
+    valid_records: int
+    invalid_records: int
+    duplicate_records: int
+    truncated: bool
+    writes_performed: int
+    by_resource_type: dict[str, int]
+    by_provider_status: dict[str, int]
+    by_local_priority: dict[str, int]
+    by_location_scope: dict[str, int]
+
+
+class FindingValidationError(ValueError):
+    """A provider record failed the importer allowlist and shape checks."""
 
 
 class AccessAnalyzerPageSource(Protocol):
@@ -158,6 +195,9 @@ def read_findings_bounded(
         remaining = max_findings - len(findings)
         findings.extend(page.findings[:remaining])
         next_token = page.next_token
+        page_was_clipped = len(page.findings) > remaining
+        if page_was_clipped:
+            return BoundedFindingRead(tuple(findings), pages_read, True)
         if next_token is None:
             return BoundedFindingRead(tuple(findings), pages_read, False)
         if not isinstance(next_token, str) or not next_token or len(next_token) > 2048:
@@ -169,3 +209,141 @@ def read_findings_bounded(
             return BoundedFindingRead(tuple(findings), pages_read, True)
 
     return BoundedFindingRead(tuple(findings), pages_read, next_token is not None)
+
+
+RESOURCE_TYPE_PATTERN = re.compile(r"^AWS::[A-Za-z0-9]+::[A-Za-z0-9]+$")
+REGION_CODE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$")
+PROVIDER_STATUSES = {"ACTIVE", "ARCHIVED", "RESOLVED"}
+GLOBAL_RESOURCE_TYPES = {"AWS::IAM::Role", "AWS::IAM::User"}
+
+
+def _provider_timestamp(value: Any, field: str) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise FindingValidationError(f"The provider timestamp {field} is invalid.") from None
+    else:
+        raise FindingValidationError(f"The provider timestamp {field} is missing or invalid.")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise FindingValidationError(f"The provider timestamp {field} must include a timezone.")
+    return parsed.astimezone(UTC)
+
+
+def _resource_location(resource_type: str, resource_arn: Any) -> tuple[str, str | None]:
+    if resource_type in GLOBAL_RESOURCE_TYPES:
+        return "global", None
+    if not isinstance(resource_arn, str) or not resource_arn.startswith("arn:"):
+        return "unknown", None
+    parts = resource_arn.split(":", 5)
+    if len(parts) != 6:
+        return "unknown", None
+    region = parts[3]
+    if not region or not REGION_CODE_PATTERN.fullmatch(region):
+        return "unknown", None
+    return "region", region
+
+
+def normalize_access_analyzer_finding(
+    analyzer_arn: str, finding: Any
+) -> AccessAnalyzerCandidate:
+    validate_analyzer_arn(analyzer_arn)
+    if not isinstance(finding, dict):
+        raise FindingValidationError("The provider finding is not an object.")
+
+    finding_id = finding.get("id")
+    resource_type = finding.get("resourceType")
+    provider_status = finding.get("status")
+    is_public = finding.get("isPublic")
+    if not isinstance(finding_id, str) or not finding_id.strip() or len(finding_id) > 2048:
+        raise FindingValidationError("The provider finding identifier is missing or invalid.")
+    if (
+        not isinstance(resource_type, str)
+        or not RESOURCE_TYPE_PATTERN.fullmatch(resource_type)
+        or len(resource_type) > 128
+    ):
+        raise FindingValidationError("The provider resource type is missing or invalid.")
+    if not isinstance(provider_status, str) or provider_status not in PROVIDER_STATUSES:
+        raise FindingValidationError("The provider finding status is missing or invalid.")
+    if not isinstance(is_public, bool):
+        raise FindingValidationError("The provider public-access value is missing or invalid.")
+
+    created_at = _provider_timestamp(finding.get("createdAt"), "createdAt")
+    updated_at = _provider_timestamp(finding.get("updatedAt"), "updatedAt")
+    analyzed_at_value = finding.get("analyzedAt", finding.get("updatedAt"))
+    analyzed_at = _provider_timestamp(analyzed_at_value, "analyzedAt")
+    location_scope, resource_region = _resource_location(
+        resource_type, finding.get("resource")
+    )
+    provider_key = hashlib.sha256(
+        f"{analyzer_arn}\0{finding_id}".encode("utf-8")
+    ).hexdigest()
+
+    return AccessAnalyzerCandidate(
+        provider_key=provider_key,
+        resource_type=resource_type,
+        provider_status=provider_status,
+        is_public=is_public,
+        created_at=created_at,
+        updated_at=updated_at,
+        analyzed_at=analyzed_at,
+        observed_at=analyzed_at,
+        local_priority="high" if is_public else "medium",
+        resource_location_scope=location_scope,
+        resource_region=resource_region,
+    )
+
+
+def run_access_analyzer_preview(
+    source: AccessAnalyzerPageSource,
+    *,
+    analyzer_arn: str,
+    page_size: int = 100,
+    max_findings: int = 500,
+    max_pages: int = 20,
+) -> AccessAnalyzerPreview:
+    analyzer_arn = validate_analyzer_arn(analyzer_arn)
+    bounded_read = read_findings_bounded(
+        source,
+        page_size=page_size,
+        max_findings=max_findings,
+        max_pages=max_pages,
+    )
+    resource_types: Counter[str] = Counter()
+    provider_statuses: Counter[str] = Counter()
+    priorities: Counter[str] = Counter()
+    location_scopes: Counter[str] = Counter()
+    provider_keys: set[str] = set()
+    invalid_records = 0
+    duplicate_records = 0
+
+    for raw_finding in bounded_read.findings:
+        try:
+            candidate = normalize_access_analyzer_finding(analyzer_arn, raw_finding)
+        except FindingValidationError:
+            invalid_records += 1
+            continue
+        if candidate.provider_key in provider_keys:
+            duplicate_records += 1
+            continue
+        provider_keys.add(candidate.provider_key)
+        resource_types[candidate.resource_type] += 1
+        provider_statuses[candidate.provider_status] += 1
+        priorities[candidate.local_priority] += 1
+        location_scopes[candidate.resource_location_scope] += 1
+
+    return AccessAnalyzerPreview(
+        pages_read=bounded_read.pages_read,
+        records_read=len(bounded_read.findings),
+        valid_records=len(provider_keys),
+        invalid_records=invalid_records,
+        duplicate_records=duplicate_records,
+        truncated=bounded_read.truncated,
+        writes_performed=0,
+        by_resource_type=dict(sorted(resource_types.items())),
+        by_provider_status=dict(sorted(provider_statuses.items())),
+        by_local_priority=dict(sorted(priorities.items())),
+        by_location_scope=dict(sorted(location_scopes.items())),
+    )

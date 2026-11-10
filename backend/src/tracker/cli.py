@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,6 +12,14 @@ from argon2 import PasswordHasher
 from sqlalchemy import select
 
 from .extensions import db
+from .importers.access_analyzer import (
+    MAX_FINDINGS_PER_RUN,
+    MAX_PAGE_SIZE,
+    MAX_PAGES_PER_RUN,
+    FixtureAccessAnalyzerPageSource,
+    ImportSourceError,
+    run_access_analyzer_preview,
+)
 from .models import Finding, User
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
@@ -40,6 +49,15 @@ def _seed_file() -> Path:
     if configured_path:
         return Path(configured_path)
     return Path(__file__).resolve().parents[3] / "database" / "seed" / "findings.json"
+
+
+def _access_analyzer_fixture_file() -> Path:
+    return (
+        Path(__file__).resolve().parents[3]
+        / "database"
+        / "seed"
+        / "access-analyzer-findings.json"
+    )
 
 
 def _validated_seed_records(path: Path) -> list[dict]:
@@ -170,6 +188,50 @@ def register_commands(app) -> None:
             db.session.rollback()
             raise click.ClickException("Synthetic findings could not be seeded.") from error
         click.echo(f"Synthetic findings: {added} added, {skipped} already present.")
+
+    @app.cli.command("access-analyzer-preview")
+    @click.option(
+        "--fixture",
+        "fixture_file",
+        type=click.Path(path_type=Path, exists=True, dir_okay=False),
+        default=None,
+        help="Synthetic Access Analyzer fixture file.",
+    )
+    @click.option(
+        "--page-size",
+        type=click.IntRange(1, MAX_PAGE_SIZE),
+        default=2,
+        show_default=True,
+    )
+    @click.option(
+        "--max-findings",
+        type=click.IntRange(1, MAX_FINDINGS_PER_RUN),
+        default=500,
+        show_default=True,
+    )
+    @click.option(
+        "--max-pages",
+        type=click.IntRange(1, MAX_PAGES_PER_RUN),
+        default=20,
+        show_default=True,
+    )
+    def access_analyzer_preview(
+        fixture_file: Path | None, page_size: int, max_findings: int, max_pages: int
+    ) -> None:
+        """Summarize synthetic Access Analyzer findings without AWS or database writes."""
+        path = fixture_file or _access_analyzer_fixture_file()
+        try:
+            source = FixtureAccessAnalyzerPageSource.from_file(path)
+            result = run_access_analyzer_preview(
+                source,
+                analyzer_arn=source.analyzer_arn,
+                page_size=page_size,
+                max_findings=max_findings,
+                max_pages=max_pages,
+            )
+        except (ImportSourceError, ValueError) as error:
+            raise click.ClickException(str(error)) from None
+        click.echo(json.dumps(asdict(result), indent=2, sort_keys=True))
 
     @app.cli.command("create-user")
     @click.argument("username")
