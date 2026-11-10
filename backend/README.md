@@ -29,4 +29,13 @@ flask --app tracker:create_app access-analyzer-preview
 
 This command reports aggregate counts, performs no database writes, and makes no AWS calls. See the [importer notes](../docs/importer.md) for the current adapter boundary and field handling.
 
+After applying migrations, import the same fixture into the local development database with an explicit confirmation:
+
+```text
+flask --app tracker:create_app db upgrade
+flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic
+```
+
+The import command accepts only the committed fixture, refuses non-development or non-local database targets, and never accesses AWS. Repeating it updates provider-owned fields in place while preserving analyst status, resolution reasons, notes, and audit history.
+
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.

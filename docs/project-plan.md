@@ -42,12 +42,12 @@ The map plots approximate positions for supported Region codes. Other codes rema
 
 - [x] Implement an injected provider adapter for a configured analyzer, with bounded pagination and a maximum batch size.
 - [x] Normalize an allowlist of provider fields for a synthetic dry run; keep raw provider payloads out of ordinary logs and public artifacts.
-- [x] Build a stable provider key scoped to its analyzer for future idempotent writes; persisted import idempotency remains pending.
+- [x] Build and persist a stable provider key scoped to its analyzer for idempotent imports.
 - [x] Include synthetic dry-run aggregate counts and bounded handling for malformed records and pagination errors.
-- [ ] Make repeated persisted imports idempotent and preserve analyst-owned fields.
+- [x] Make repeated synthetic fixture imports idempotent and preserve analyst-owned fields.
 - [ ] Enable a real AWS client only after the account, Region, exact fields, access list, retention period, and purge date are explicitly approved.
-- On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
-- Use fabricated fixtures for pagination, deduplication, update, and failure scenarios.
+- [x] On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
+- [ ] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
 
 ### 4. Controlled live pilot
 
