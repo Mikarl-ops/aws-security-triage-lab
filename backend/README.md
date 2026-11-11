@@ -39,3 +39,14 @@ flask --app tracker:create_app access-analyzer-import-fixture --confirm-syntheti
 The import command accepts only the committed fixture, refuses non-development or non-local database targets, and never accesses AWS. Repeating it updates provider-owned fields in place while preserving analyst status, resolution reasons, notes, and audit history.
 
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.
+
+## Automated checks
+
+With the dependencies installed, run from this directory:
+
+```text
+python -m ruff check src tests
+python -m pytest
+```
+
+The default suite uses temporary SQLite databases and never uses the application's `DATABASE_URL`. GitHub also runs it against a disposable PostgreSQL service, including the confirmed fixture import command. See [test setup and coverage](../docs/testing.md) for local PostgreSQL instructions and the covered scenarios.
