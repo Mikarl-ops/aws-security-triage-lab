@@ -23,6 +23,7 @@ See the evolving project documents:
 - [Architecture](docs/architecture.md)
 - [API contract](docs/api-contract.md)
 - [Importer notes](docs/importer.md)
+- [Automated checks](docs/testing.md)
 - [Data handling and authorization](docs/data-handling.md)
 
 ## Preview the dashboard

@@ -40,3 +40,7 @@ On repeat imports, the key and database uniqueness constraint prevent duplicate 
 ## Next implementation boundary
 
 Before any live read, explicitly approve the account and Region, analyzer, exact fields, role, database access list, retention period, and purge date. A future command may then construct a read-only AWS client through the normal temporary-credential provider chain. No live-read command is available today.
+
+## Automated coverage
+
+The [regression suite](testing.md) covers bounded reads, malformed and duplicate findings, unchanged repeat imports, provider updates that preserve analyst decisions, transaction rollback, migrations, and viewer permissions. GitHub runs it against both SQLite and a disposable PostgreSQL service. These checks use fabricated fixtures and make no AWS calls.

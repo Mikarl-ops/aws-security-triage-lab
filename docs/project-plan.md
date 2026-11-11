@@ -28,7 +28,7 @@ Current AWS service terms and costs must be verified before choosing or enabling
 - Keep provider status separate from analyst triage status.
 - Define a documented local priority rule if the UI needs severity-like prioritization; do not invent provider severity.
 
-The first implementation uses the existing synthetic severity field for the dashboard. Before importing Access Analyzer records, define and label any local priority mapping separately from provider-owned fields.
+Synthetic Access Analyzer imports use a documented application priority: public findings receive `high` and non-public external findings receive `medium` in the dashboard severity field. This mapping is separate from the retained provider status and public-access flag; Access Analyzer severity is not inferred.
 
 ### 2. Region data model and map
 
@@ -47,7 +47,8 @@ The map plots approximate positions for supported Region codes. Other codes rema
 - [x] Make repeated synthetic fixture imports idempotent and preserve analyst-owned fields.
 - [ ] Enable a real AWS client only after the account, Region, exact fields, access list, retention period, and purge date are explicitly approved.
 - [x] On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
-- [ ] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
+- [x] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
+- [x] Run migrations, ownership checks, and fixture-command checks against a disposable PostgreSQL service in CI.
 
 ### 4. Controlled live pilot
 
@@ -55,10 +56,12 @@ Before the first AWS read, record explicit approval for the account and Region, 
 
 ## Pilot acceptance
 
-- A bounded dry run reports aggregate counts and writes no findings.
-- Importing the same fixture twice creates no duplicates.
-- A provider update changes only provider-owned data.
-- Analyst status, notes, resolution decisions, and audit history survive re-import.
-- A viewer can read findings but receives a server-side denial when attempting to modify them.
-- Public examples and CI use synthetic data only.
+- [x] A bounded dry run reports aggregate counts and writes no findings.
+- [x] Importing the same fixture twice creates no duplicates or unnecessary updates.
+- [x] A provider update changes only provider-owned and application-derived data.
+- [x] Analyst status, notes, resolution decisions, and audit history survive re-import.
+- [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
+- [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
+
+These checked items are covered by the synthetic [importer regression suite](testing.md). They do not represent live AWS verification.

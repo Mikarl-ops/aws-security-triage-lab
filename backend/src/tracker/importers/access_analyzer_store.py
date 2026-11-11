@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -60,6 +61,17 @@ def _finding_fields(candidate: AccessAnalyzerCandidate) -> dict[str, Any]:
     }
 
 
+def _equivalent_value(stored: Any, incoming: Any) -> bool:
+    # SQLite returns naive timestamps; the importer writes UTC instants on every backend.
+    if isinstance(stored, datetime) and isinstance(incoming, datetime):
+        if stored.tzinfo is None:
+            stored = stored.replace(tzinfo=UTC)
+        if incoming.tzinfo is None:
+            incoming = incoming.replace(tzinfo=UTC)
+        return stored.astimezone(UTC) == incoming.astimezone(UTC)
+    return stored == incoming
+
+
 def import_access_analyzer_fixture(
     session: Session,
     source: AccessAnalyzerPageSource,
@@ -108,7 +120,7 @@ def import_access_analyzer_fixture(
 
             changed = False
             for field, value in fields.items():
-                if getattr(existing, field) != value:
+                if not _equivalent_value(getattr(existing, field), value):
                     setattr(existing, field, value)
                     changed = True
             if changed:
