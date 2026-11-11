@@ -14,9 +14,7 @@ from typing import Any, Protocol
 MAX_PAGE_SIZE = 100
 MAX_FINDINGS_PER_RUN = 1000
 MAX_PAGES_PER_RUN = 25
-ANALYZER_ARN_PATTERN = re.compile(
-    r"^arn:[^:]+:access-analyzer:[^:]+:\d{12}:analyzer/.{1,255}$"
-)
+ANALYZER_ARN_PATTERN = re.compile(r"^arn:[^:]+:access-analyzer:[^:]+:\d{12}:analyzer/.{1,255}$")
 
 
 class ImportSourceError(RuntimeError):
@@ -115,7 +113,9 @@ class AwsAccessAnalyzerPageSource:
         try:
             response = self._client.list_findings(**request)
         except Exception:
-            raise ImportSourceError("IAM Access Analyzer could not return a findings page.") from None
+            raise ImportSourceError(
+                "IAM Access Analyzer could not return a findings page."
+            ) from None
         if not isinstance(response, dict) or not isinstance(response.get("findings"), list):
             raise ImportSourceError("IAM Access Analyzer returned an invalid findings page.")
         returned_token = response.get("nextToken")
@@ -138,15 +138,21 @@ class FixtureAccessAnalyzerPageSource:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            raise ImportSourceError("The synthetic Access Analyzer fixture could not be read.") from None
+            raise ImportSourceError(
+                "The synthetic Access Analyzer fixture could not be read."
+            ) from None
         if not isinstance(payload, dict) or set(payload) != {"analyzer_arn", "findings"}:
             raise ImportSourceError("The synthetic Access Analyzer fixture has an invalid shape.")
         if not isinstance(payload["findings"], list):
-            raise ImportSourceError("The synthetic Access Analyzer fixture has an invalid findings list.")
+            raise ImportSourceError(
+                "The synthetic Access Analyzer fixture has an invalid findings list."
+            )
         try:
             return cls(payload["analyzer_arn"], payload["findings"])
         except ValueError as error:
-            raise ImportSourceError("The synthetic Access Analyzer fixture has invalid configuration.") from error
+            raise ImportSourceError(
+                "The synthetic Access Analyzer fixture has invalid configuration."
+            ) from error
 
     def fetch_page(self, *, next_token: str | None, page_size: int) -> AccessAnalyzerPage:
         start = 0
@@ -156,7 +162,9 @@ class FixtureAccessAnalyzerPageSource:
             try:
                 start = int(next_token.removeprefix("fixture-offset:"))
             except ValueError:
-                raise PaginationError("The synthetic fixture received an invalid pagination token.") from None
+                raise PaginationError(
+                    "The synthetic fixture received an invalid pagination token."
+                ) from None
         end = min(start + page_size, len(self._findings))
         page = self._findings[start:end]
         next_page = f"fixture-offset:{end}" if end < len(self._findings) else None
@@ -256,9 +264,7 @@ def _resource_location(resource_type: str, resource_arn: Any) -> tuple[str, str 
     return "region", region
 
 
-def normalize_access_analyzer_finding(
-    analyzer_arn: str, finding: Any
-) -> AccessAnalyzerCandidate:
+def normalize_access_analyzer_finding(analyzer_arn: str, finding: Any) -> AccessAnalyzerCandidate:
     validate_analyzer_arn(analyzer_arn)
     if not isinstance(finding, dict):
         raise FindingValidationError("The provider finding is not an object.")
@@ -284,12 +290,8 @@ def normalize_access_analyzer_finding(
     updated_at = _provider_timestamp(finding.get("updatedAt"), "updatedAt")
     analyzed_at_value = finding.get("analyzedAt", finding.get("updatedAt"))
     analyzed_at = _provider_timestamp(analyzed_at_value, "analyzedAt")
-    location_scope, resource_region = _resource_location(
-        resource_type, finding.get("resource")
-    )
-    provider_key = hashlib.sha256(
-        f"{analyzer_arn}\0{finding_id}".encode("utf-8")
-    ).hexdigest()
+    location_scope, resource_region = _resource_location(resource_type, finding.get("resource"))
+    provider_key = hashlib.sha256(f"{analyzer_arn}\0{finding_id}".encode()).hexdigest()
 
     return AccessAnalyzerCandidate(
         provider_key=provider_key,
