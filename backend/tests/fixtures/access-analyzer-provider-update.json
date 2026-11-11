@@ -1,0 +1,25 @@
+{
+  "analyzer_arn": "arn:aws:access-analyzer:ap-southeast-1:000000000000:analyzer/synthetic-lab",
+  "findings": [
+    {
+      "id": "synthetic-access-analyzer-001",
+      "resourceType": "AWS::S3::Bucket",
+      "resource": "arn:aws:s3:::synthetic-public-bucket",
+      "isPublic": false,
+      "status": "ARCHIVED",
+      "createdAt": "2026-10-30T08:00:00Z",
+      "updatedAt": "2026-10-31T09:00:00Z",
+      "analyzedAt": "2026-10-31T09:05:00Z"
+    },
+    {
+      "id": "synthetic-access-analyzer-004",
+      "resourceType": "AWS::SQS::Queue",
+      "resource": "arn:aws:sqs:ap-southeast-1:000000000000:synthetic-queue",
+      "isPublic": false,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-31T10:00:00Z",
+      "updatedAt": "2026-10-31T10:00:00Z",
+      "analyzedAt": "2026-10-31T10:05:00Z"
+    }
+  ]
+}
