@@ -174,8 +174,6 @@ export function App() {
   useEffect(() => {
     if (authState !== "authenticated" || !user) return;
     let active = true;
-    setAnalyticsLoading(true);
-    setAnalyticsError(null);
     api.getAnalytics(analyticsFilters)
       .then((result) => {
         if (active) setAnalytics(result);
@@ -201,8 +199,6 @@ export function App() {
   useEffect(() => {
     if (authState !== "authenticated" || !user) return;
     let active = true;
-    setRegionAnalyticsLoading(true);
-    setRegionAnalyticsError(null);
     api.getRegionAnalytics(analyticsFilters)
       .then((result) => {
         if (active) setRegionAnalytics(result);
@@ -263,7 +259,15 @@ export function App() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedId]);
 
+  function prepareAnalyticsRefresh() {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    setRegionAnalyticsLoading(true);
+    setRegionAnalyticsError(null);
+  }
+
   async function retrySession() {
+    prepareAnalyticsRefresh();
     setAuthState("checking");
     setAuthError(null);
     try {
@@ -282,6 +286,7 @@ export function App() {
   }
 
   async function handleLogin(username: string, password: string) {
+    prepareAnalyticsRefresh();
     setLoginBusy(true);
     setAuthError(null);
     setDashboardLoading(true);
@@ -319,6 +324,7 @@ export function App() {
   }
 
   function handleFilterChange(nextFilters: FindingFiltersView) {
+    prepareAnalyticsRefresh();
     setDashboardLoading(true);
     setDashboardError(null);
     setFilters(nextFilters);
@@ -357,6 +363,7 @@ export function App() {
       setFindingDetail(updated);
       setDetailLoading(true);
       setDetailError(null);
+      prepareAnalyticsRefresh();
       setRefreshToken((token) => token + 1);
       setDetailReload((revision) => revision + 1);
       return true;
@@ -390,6 +397,7 @@ export function App() {
       setDetailLoading(true);
       setDetailError(null);
       setDetailReload((revision) => revision + 1);
+      prepareAnalyticsRefresh();
       setRefreshToken((token) => token + 1);
       return true;
     } catch (error) {
@@ -577,6 +585,7 @@ export function App() {
             onOpen={openFinding}
             onPageChange={handlePageChange}
             onRetry={() => {
+              prepareAnalyticsRefresh();
               setDashboardLoading(true);
               setDashboardError(null);
               setRefreshToken((token) => token + 1);

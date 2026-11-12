@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "./api";
 import { App } from "./App";
@@ -221,6 +221,40 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("resets failed analytics when a filter starts a new request", async () => {
+    mockedApi.getAnalytics.mockRejectedValueOnce(new Error("Synthetic chart failure"));
+    mockedApi.getRegionAnalytics.mockRejectedValueOnce(new Error("Synthetic Region failure"));
+    render(<App />);
+    await screen.findAllByText(/Analytics unavailable:/);
+    await screen.findByText(/Region analytics unavailable:/);
+
+    let finishAnalytics: (result: FindingAnalytics) => void = () => {};
+    let finishRegions: (result: FindingRegionAnalytics) => void = () => {};
+    mockedApi.getAnalytics.mockImplementationOnce(() => new Promise((resolve) => {
+      finishAnalytics = resolve;
+    }));
+    mockedApi.getRegionAnalytics.mockImplementationOnce(() => new Promise((resolve) => {
+      finishRegions = resolve;
+    }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+      target: { value: "investigating" },
+    });
+    expect(screen.getAllByText("Loading analytics…")).toHaveLength(2);
+    expect(screen.getByText("Loading Region analytics…")).toBeInTheDocument();
+    expect(screen.queryByText(/Region analytics unavailable:/)).not.toBeInTheDocument();
+    expect(screen.queryAllByText(/Analytics unavailable:/)).toHaveLength(0);
+
+    const window = { days: 30, start: "2026-10-14", end: "2026-11-12", timezone: "UTC" as const };
+    await act(async () => {
+      finishAnalytics({ window, total: 0, by_resource_type: [], by_observed_day: [] });
+      finishRegions({ window, total: 0, by_region: [], by_scope: { region: 0, global: 0, unknown: 0 } });
+    });
+    expect(screen.queryByText("Loading Region analytics…")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Loading analytics…")).toHaveLength(0);
+    expect(within(screen.getByRole("region", { name: "Finding analytics" }))
+      .getAllByText("No findings match these filters in this period.")).toHaveLength(2);
+  });
+
   it("renders HTML-like finding and note content as plain text", async () => {
     const finding = serverFindings[0];
     finding.title = '<img data-ci-xss src=x onerror="alert(1)">';
