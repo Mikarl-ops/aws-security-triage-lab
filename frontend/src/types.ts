@@ -8,6 +8,16 @@ export type ResourceLocation =
   | { scope: "region"; region: string }
   | { scope: "global" | "unknown"; region: null };
 
+export type ProviderFindingStatus = "ACTIVE" | "ARCHIVED" | "RESOLVED";
+
+export interface FindingProvider {
+  status: ProviderFindingStatus;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  analyzed_at: string;
+}
+
 export interface Finding {
   id: string;
   title: string;
@@ -21,6 +31,7 @@ export interface Finding {
   source_event_id: string | null;
   evidence_summary: string;
   resource_location: ResourceLocation;
+  provider: FindingProvider | null;
   metadata: Record<string, string | number | boolean>;
   resolution_reason: string | null;
   created_at: string;

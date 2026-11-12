@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { AuditEvent, Finding, FindingNote, FindingStatus } from "../types";
 import { allowedTransitions, formatDate, severityLabels, statusLabels } from "../presentation";
+import { ProviderContext } from "./ProviderContext";
 
 interface FindingDetailsProps {
   finding: Finding | null;
@@ -84,7 +85,7 @@ export function FindingDetails({
                   <span className="severity-dot" />
                   {severityLabels[finding.severity]} severity
                 </span>
-                <span className={`status status-${finding.status}`}>{statusLabels[finding.status]}</span>
+                <span className={`status status-${finding.status}`}>Analyst status: {statusLabels[finding.status]}</span>
               </div>
               <h3 className="detail-finding-title">{finding.title}</h3>
               <p className="detail-description">{finding.description}</p>
@@ -117,7 +118,7 @@ export function FindingDetails({
                   </div>
                   {finding.source_event_id && (
                     <div>
-                      <dt>Source event</dt>
+                      <dt>{finding.provider ? "Provider reference" : "Source event"}</dt>
                       <dd>{finding.source_event_id}</dd>
                     </div>
                   )}
@@ -135,6 +136,8 @@ export function FindingDetails({
                   </div>
                 )}
               </section>
+
+              {finding.provider && <ProviderContext provider={finding.provider} />}
 
               {canUpdate && choices.length > 0 && (
                 <section className="detail-section action-section">

@@ -221,6 +221,29 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("retains provider context after an analyst status change", async () => {
+    const finding = serverFindings[0];
+    finding.source = "aws-access-analyzer";
+    finding.source_event_id = "0".repeat(64);
+    finding.provider = {
+      status: "ARCHIVED",
+      is_public: false,
+      created_at: "2026-10-30T08:00:00Z",
+      updated_at: "2026-10-31T09:00:00Z",
+      analyzed_at: "2026-10-31T09:05:00Z",
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const context = await screen.findByRole("region", { name: "Provider context" });
+    expect(within(context).getByText("Archived")).toBeInTheDocument();
+    expect(screen.getByText("Analyst status: New")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Investigating");
+    expect(within(screen.getByRole("region", { name: "Provider context" }))
+      .getByText("Archived")).toBeInTheDocument();
+    expect(serverFindings[0].provider).toEqual(finding.provider);
+  });
+
   it("resets failed analytics when a filter starts a new request", async () => {
     mockedApi.getAnalytics.mockRejectedValueOnce(new Error("Synthetic chart failure"));
     mockedApi.getRegionAnalytics.mockRejectedValueOnce(new Error("Synthetic Region failure"));
