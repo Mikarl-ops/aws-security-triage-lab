@@ -83,12 +83,17 @@ export function FindingDetails({
               <div className="detail-title-row">
                 <span className={`severity severity-${finding.severity}`}>
                   <span className="severity-dot" />
-                  {severityLabels[finding.severity]} severity
+                  {severityLabels[finding.severity]} priority
                 </span>
                 <span className={`status status-${finding.status}`}>Analyst status: {statusLabels[finding.status]}</span>
               </div>
               <h3 className="detail-finding-title">{finding.title}</h3>
               <p className="detail-description">{finding.description}</p>
+              {finding.source === "aws-access-analyzer" && (
+                <p className="priority-explanation">
+                  Access Analyzer triage rule: High for reported public access; Medium for other external access.
+                </p>
+              )}
 
               <section className="detail-section">
                 <h3>Evidence summary</h3>

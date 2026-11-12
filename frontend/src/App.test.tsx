@@ -224,6 +224,7 @@ describe("API-connected findings workbench", () => {
   it("retains provider context after an analyst status change", async () => {
     const finding = serverFindings[0];
     finding.source = "aws-access-analyzer";
+    finding.severity = "medium";
     finding.source_event_id = "0".repeat(64);
     finding.provider = {
       status: "ARCHIVED",
@@ -259,7 +260,7 @@ describe("API-connected findings workbench", () => {
     mockedApi.getRegionAnalytics.mockImplementationOnce(() => new Promise((resolve) => {
       finishRegions = resolve;
     }));
-    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), {
       target: { value: "investigating" },
     });
     expect(screen.getAllByText("Loading analytics…")).toHaveLength(2);
@@ -314,7 +315,7 @@ describe("API-connected findings workbench", () => {
     render(<App />);
 
     await screen.findByRole("button", { name: "View Repeated failed console sign-ins" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), {
       target: { value: "investigating" },
     });
 
@@ -323,6 +324,21 @@ describe("API-connected findings workbench", () => {
         expect.objectContaining({ page: 1, status: "investigating" }),
       ),
     );
+    expect(await screen.findByText("Storage policy allows public access")).toBeInTheDocument();
+    expect(screen.queryByText("Repeated failed console sign-ins")).not.toBeInTheDocument();
+  });
+
+  it("sends the triage-priority filter through the existing severity API field", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "View Repeated failed console sign-ins" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Triage priority" }), {
+      target: { value: "high" },
+    });
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ severity: "high", page: 1 }),
+    ));
+    await waitFor(() => expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ severity: "high" }));
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ severity: "high" });
     expect(await screen.findByText("Storage policy allows public access")).toBeInTheDocument();
     expect(screen.queryByText("Repeated failed console sign-ins")).not.toBeInTheDocument();
   });

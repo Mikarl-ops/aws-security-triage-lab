@@ -845,7 +845,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
   letter-spacing: -0.035em;
 }
 
-.detail-description, .detail-section > p, .note-card p, .resolution-callout p {
+.detail-description, .priority-explanation, .detail-section > p, .note-card p, .resolution-callout p {
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.55;
@@ -853,6 +853,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
 }
 
 .detail-description { margin: 0; }
+.priority-explanation { margin: 8px 0 0; }
 
 .detail-section {
   margin-top: 15px;

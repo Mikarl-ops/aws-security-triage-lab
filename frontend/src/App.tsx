@@ -545,7 +545,7 @@ export function App() {
             </article>
             <article className="summary-card critical-card">
               <div className="summary-topline">
-                <span className="summary-label">Critical</span>
+                <span className="summary-label">Critical priority</span>
                 <span className="summary-icon icon-red"><span className="summary-alert">!</span></span>
               </div>
               <strong className="summary-value">{summary.by_severity.critical}</strong>

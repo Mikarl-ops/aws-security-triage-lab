@@ -64,26 +64,26 @@ export function FindingsTable({
           <span>Filter by</span>
         </div>
         <label className="filter-select">
-          <span className="sr-only">Status</span>
+          <span className="sr-only">Analyst status</span>
           <select
-            aria-label="Status"
+            aria-label="Analyst status"
             onChange={(event) => updateFilter("status", event.target.value as FindingFiltersView["status"])}
             value={filters.status}
           >
-            <option value="all">All statuses</option>
+            <option value="all">All analyst statuses</option>
             {Object.entries(statusLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </label>
         <label className="filter-select">
-          <span className="sr-only">Severity</span>
+          <span className="sr-only">Triage priority</span>
           <select
-            aria-label="Severity"
+            aria-label="Triage priority"
             onChange={(event) => updateFilter("severity", event.target.value as FindingFiltersView["severity"])}
             value={filters.severity}
           >
-            <option value="all">All severities</option>
+            <option value="all">All priorities</option>
             {Object.entries(severityLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
@@ -118,8 +118,8 @@ export function FindingsTable({
           <thead>
             <tr>
               <th scope="col">Finding</th>
-              <th scope="col">Severity</th>
-              <th scope="col">Status</th>
+              <th scope="col">Triage priority</th>
+              <th scope="col">Analyst status</th>
               <th scope="col">Source</th>
               <th scope="col">Last updated</th>
               <th scope="col"><span className="sr-only">Actions</span></th>

@@ -20,6 +20,7 @@ function showDetails(overrides: Partial<Finding> = {}) {
     source: "aws-access-analyzer",
     source_event_id: "0".repeat(64),
     status: "resolved",
+    severity: "medium",
     provider: syntheticProvider,
     ...overrides,
   };
@@ -52,7 +53,7 @@ describe("provider context in finding details", () => {
 
   it.each(["ACTIVE", "ARCHIVED", "RESOLVED"] as const)(
     "shows the %s provider state with explicit public access", (status) => {
-      showDetails({ provider: { ...syntheticProvider, status, is_public: true } });
+      showDetails({ severity: "high", provider: { ...syntheticProvider, status, is_public: true } });
       const context = screen.getByRole("region", { name: "Provider context" });
       expect(within(context).getByText("Provider status").parentElement).toHaveTextContent(
         status.charAt(0) + status.slice(1).toLowerCase(),
@@ -74,6 +75,18 @@ describe("provider context in finding details", () => {
     expect(screen.queryByRole("region", { name: "Provider context" })).not.toBeInTheDocument();
     expect(screen.queryByText("Public access reported")).not.toBeInTheDocument();
     expect(screen.getByText("Source event")).toBeInTheDocument();
+  });
+
+  it("explains the local Access Analyzer priority rule", () => {
+    showDetails();
+    expect(screen.getByText("Medium priority")).toBeInTheDocument();
+    expect(screen.getByText(/Access Analyzer triage rule: High for reported public access/))
+      .toBeInTheDocument();
+  });
+
+  it("does not apply the Access Analyzer rule to other sources", () => {
+    showDetails({ source: "config", provider: null });
+    expect(screen.queryByText(/Access Analyzer triage rule/)).not.toBeInTheDocument();
   });
 
   it("sends only an analyst transition when the analyst saves status", async () => {
