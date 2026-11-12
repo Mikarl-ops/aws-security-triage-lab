@@ -12,6 +12,8 @@ Findings store resource placement in typed `resource_location_scope` and `resour
 
 The dashboard plots approximate positions for a curated set of AWS Region codes. Codes without a plotted position remain in the adjacent count list. Global and unknown resources are summarized separately and do not receive coordinates.
 
+Finding details show provider status, public access, and provider timestamps in a read-only section when those fields exist. Analyst status and status-change controls remain separate. The queue labels the application-assigned `severity` values as Triage priority and explains the Access Analyzer priority rule in the drawer.
+
 ## Intended local pilot
 
 ```mermaid
@@ -27,7 +29,7 @@ The local API owns authentication, role checks, analyst actions, and aggregate r
 
 | Provider-owned fields | Analyst-owned fields | Application-derived fields |
 |---|---|---|
-| Source and analyzer-scoped provider key | Triage status | Local priority in the dashboard severity field |
+| Source and analyzer-scoped provider key | Triage status | Local priority stored in `severity` and displayed as Triage priority |
 | Resource type, public-access flag, and provider timestamps | Notes and resolution reason | Generated title and summary |
 | Provider status and allowlisted resource summary | Audit history and actor | Resource location classification |
 

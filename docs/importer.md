@@ -29,7 +29,9 @@ Other provider fields, including resource-owner account, principal, action, cond
 
 IAM roles and users are classified as global. Other resources are classified as regional only when their resource ARN contains a Region-shaped code; resources without enough information, including global-form resource ARNs that omit a Region, remain unknown. The analyzer's Region is not substituted for a resource Region, and source-IP geography is not used.
 
-The preview labels public findings as local priority `high` and non-public external findings as `medium`. This is an application triage rule, not a provider severity. The synthetic fixture importer stores this application-assigned value in the dashboard's `severity` field; it does not claim that Access Analyzer supplied a severity.
+The preview labels public findings as local priority `high` and non-public external findings as `medium`. This is an application triage rule, not a provider severity. The synthetic fixture importer stores this application-assigned value in the `severity` field. The dashboard calls it Triage priority and explains the rule for Access Analyzer findings.
+
+The drawer displays provider status, public access, and provider creation, update, and analysis timestamps separately from analyst status. Provider context is read-only. Findings without provider fields omit this section rather than implying a provider status or public-access value.
 
 ## Persistence behavior
 

@@ -25,10 +25,11 @@ Current AWS service terms and costs must be verified before choosing or enabling
 - [x] Calculate aggregates over the complete filtered result set, independent of table pagination.
 - [x] Define timestamp semantics, time buckets, filter behavior, empty states, and treatment of unknown resource types.
 - [x] Render responsive charts for resource types and daily observations in the dashboard.
-- Keep provider status separate from analyst triage status.
-- Define a documented local priority rule if the UI needs severity-like prioritization; do not invent provider severity.
+- [x] Show provider status, public-access flag, and provider timestamps separately from analyst triage status.
+- [x] Label local triage priority and explain the Access Analyzer rule in finding details.
+- [x] Run dashboard lint, behavior tests, and production builds in CI.
 
-Synthetic Access Analyzer imports use a documented application priority: public findings receive `high` and non-public external findings receive `medium` in the dashboard severity field. This mapping is separate from the retained provider status and public-access flag; Access Analyzer severity is not inferred.
+Synthetic Access Analyzer imports use a documented application priority: public findings receive `high` and non-public external findings receive `medium` in the stored `severity` field. The UI calls this Triage priority and labels analyst status explicitly. Provider context is read-only and displayed in its own section; Access Analyzer severity is not inferred.
 
 ### 2. Region data model and map
 

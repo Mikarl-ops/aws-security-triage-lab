@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "./api";
 import { App } from "./App";
@@ -221,6 +221,64 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("retains provider context after an analyst status change", async () => {
+    const finding = serverFindings[0];
+    finding.source = "aws-access-analyzer";
+    finding.severity = "medium";
+    finding.source_event_id = "0".repeat(64);
+    finding.provider = {
+      status: "ARCHIVED",
+      is_public: false,
+      created_at: "2026-10-30T08:00:00Z",
+      updated_at: "2026-10-31T09:00:00Z",
+      analyzed_at: "2026-10-31T09:05:00Z",
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const context = await screen.findByRole("region", { name: "Provider context" });
+    expect(within(context).getByText("Archived")).toBeInTheDocument();
+    expect(screen.getByText("Analyst status: New")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Investigating");
+    expect(within(screen.getByRole("region", { name: "Provider context" }))
+      .getByText("Archived")).toBeInTheDocument();
+    expect(serverFindings[0].provider).toEqual(finding.provider);
+  });
+
+  it("resets failed analytics when a filter starts a new request", async () => {
+    mockedApi.getAnalytics.mockRejectedValueOnce(new Error("Synthetic chart failure"));
+    mockedApi.getRegionAnalytics.mockRejectedValueOnce(new Error("Synthetic Region failure"));
+    render(<App />);
+    await screen.findAllByText(/Analytics unavailable:/);
+    await screen.findByText(/Region analytics unavailable:/);
+
+    let finishAnalytics: (result: FindingAnalytics) => void = () => {};
+    let finishRegions: (result: FindingRegionAnalytics) => void = () => {};
+    mockedApi.getAnalytics.mockImplementationOnce(() => new Promise((resolve) => {
+      finishAnalytics = resolve;
+    }));
+    mockedApi.getRegionAnalytics.mockImplementationOnce(() => new Promise((resolve) => {
+      finishRegions = resolve;
+    }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), {
+      target: { value: "investigating" },
+    });
+    expect(screen.getAllByText("Loading analytics…")).toHaveLength(2);
+    expect(screen.getByText("Loading Region analytics…")).toBeInTheDocument();
+    expect(screen.queryByText(/Region analytics unavailable:/)).not.toBeInTheDocument();
+    expect(screen.queryAllByText(/Analytics unavailable:/)).toHaveLength(0);
+
+    const window = { days: 30, start: "2026-10-14", end: "2026-11-12", timezone: "UTC" as const };
+    await act(async () => {
+      finishAnalytics({ window, total: 0, by_resource_type: [], by_observed_day: [] });
+      finishRegions({ window, total: 0, by_region: [], by_scope: { region: 0, global: 0, unknown: 0 } });
+    });
+    expect(screen.queryByText("Loading Region analytics…")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Loading analytics…")).toHaveLength(0);
+    expect(within(screen.getByRole("region", { name: "Finding analytics" }))
+      .getAllByText("No findings match these filters in this period.")).toHaveLength(2);
+  });
+
   it("renders HTML-like finding and note content as plain text", async () => {
     const finding = serverFindings[0];
     finding.title = '<img data-ci-xss src=x onerror="alert(1)">';
@@ -257,7 +315,7 @@ describe("API-connected findings workbench", () => {
     render(<App />);
 
     await screen.findByRole("button", { name: "View Repeated failed console sign-ins" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), {
       target: { value: "investigating" },
     });
 
@@ -266,6 +324,21 @@ describe("API-connected findings workbench", () => {
         expect.objectContaining({ page: 1, status: "investigating" }),
       ),
     );
+    expect(await screen.findByText("Storage policy allows public access")).toBeInTheDocument();
+    expect(screen.queryByText("Repeated failed console sign-ins")).not.toBeInTheDocument();
+  });
+
+  it("sends the triage-priority filter through the existing severity API field", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "View Repeated failed console sign-ins" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Triage priority" }), {
+      target: { value: "high" },
+    });
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ severity: "high", page: 1 }),
+    ));
+    await waitFor(() => expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ severity: "high" }));
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ severity: "high" });
     expect(await screen.findByText("Storage policy allows public access")).toBeInTheDocument();
     expect(screen.queryByText("Repeated failed console sign-ins")).not.toBeInTheDocument();
   });

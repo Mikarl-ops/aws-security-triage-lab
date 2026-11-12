@@ -85,7 +85,6 @@ export function RegionsMap({ analytics, error, loading }: RegionsMapProps) {
     ? `${displayDate(analytics.window.start)} – ${displayDate(analytics.window.end)} · UTC`
     : "Last 30 days · UTC";
   const plottedRegions = analytics?.by_region.filter((item) => REGION_POSITIONS[item.region]) ?? [];
-  const unplottedRegions = analytics?.by_region.filter((item) => !REGION_POSITIONS[item.region]) ?? [];
 
   return (
     <section aria-labelledby="regions-title" className="region-panel">
