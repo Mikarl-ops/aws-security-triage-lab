@@ -54,6 +54,22 @@ Finding detail responses include `resource_location` as a separate value with `s
 
 Detail responses include `provider` as null for findings without provider-owned fields. Imported findings return only the allowlisted provider status, public-access flag, and provider creation, update, and analysis timestamps. These fields remain separate from analyst status, resolution reason, notes, and application timestamps.
 
+Example provider context for a synthetic imported finding:
+
+```json
+{
+  "provider": {
+    "status": "ARCHIVED",
+    "is_public": false,
+    "created_at": "2026-10-30T08:00:00Z",
+    "updated_at": "2026-10-31T09:00:00Z",
+    "analyzed_at": "2026-10-31T09:05:00Z"
+  }
+}
+```
+
+The dashboard shows this context in a read-only section and formats its timestamps in UTC. The Triage priority and Analyst status filters continue to send the existing `severity` and `status` API parameters. Access Analyzer priority is assigned by the documented local rule; provider status does not change analyst status.
+
 ### `GET /findings/region-analytics`
 
 Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts the same `status`, `severity`, and `source` filters as `/findings/analytics`; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
