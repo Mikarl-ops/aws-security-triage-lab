@@ -52,6 +52,11 @@ class AccessAnalyzerCandidate:
     resource_location_scope: str
     resource_region: str | None
 
+    @property
+    def snapshot_order(self) -> tuple[datetime, datetime]:
+        """The lab orders snapshots by provider update time, then policy analysis time."""
+        return self.updated_at, self.analyzed_at
+
 
 @dataclass(frozen=True)
 class AccessAnalyzerPreview:
@@ -365,8 +370,7 @@ def collect_access_analyzer_candidates(
         max_findings=max_findings,
         max_pages=max_pages,
     )
-    candidates: list[AccessAnalyzerCandidate] = []
-    provider_keys: set[str] = set()
+    candidates: dict[str, AccessAnalyzerCandidate] = {}
     invalid_records = 0
     duplicate_records = 0
 
@@ -376,14 +380,16 @@ def collect_access_analyzer_candidates(
         except FindingValidationError:
             invalid_records += 1
             continue
-        if candidate.provider_key in provider_keys:
+        previous = candidates.get(candidate.provider_key)
+        if previous is not None:
             duplicate_records += 1
+            if candidate.snapshot_order > previous.snapshot_order:
+                candidates[candidate.provider_key] = candidate
             continue
-        provider_keys.add(candidate.provider_key)
-        candidates.append(candidate)
+        candidates[candidate.provider_key] = candidate
 
     return AccessAnalyzerCandidateBatch(
-        candidates=tuple(candidates),
+        candidates=tuple(candidates.values()),
         pages_read=bounded_read.pages_read,
         records_read=len(bounded_read.findings),
         invalid_records=invalid_records,

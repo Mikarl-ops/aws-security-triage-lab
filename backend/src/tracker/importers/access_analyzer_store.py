@@ -30,6 +30,7 @@ class AccessAnalyzerImportResult:
     created_records: int
     updated_records: int
     unchanged_records: int
+    stale_records: int
     invalid_records: int
     duplicate_records: int
     truncated: bool
@@ -61,15 +62,25 @@ def _finding_fields(candidate: AccessAnalyzerCandidate) -> dict[str, Any]:
     }
 
 
-def _equivalent_value(stored: Any, incoming: Any) -> bool:
+def _as_utc(value: datetime) -> datetime:
     # SQLite returns naive timestamps; the importer writes UTC instants on every backend.
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _equivalent_value(stored: Any, incoming: Any) -> bool:
     if isinstance(stored, datetime) and isinstance(incoming, datetime):
-        if stored.tzinfo is None:
-            stored = stored.replace(tzinfo=UTC)
-        if incoming.tzinfo is None:
-            incoming = incoming.replace(tzinfo=UTC)
-        return stored.astimezone(UTC) == incoming.astimezone(UTC)
+        return _as_utc(stored) == _as_utc(incoming)
     return stored == incoming
+
+
+def _is_stale(candidate: AccessAnalyzerCandidate, existing: Finding) -> bool:
+    if existing.provider_updated_at is None or existing.provider_analyzed_at is None:
+        return False
+    stored_order = (
+        _as_utc(existing.provider_updated_at),
+        _as_utc(existing.provider_analyzed_at),
+    )
+    return candidate.snapshot_order < stored_order
 
 
 def import_access_analyzer_fixture(
@@ -96,6 +107,7 @@ def import_access_analyzer_fixture(
     created_records = 0
     updated_records = 0
     unchanged_records = 0
+    stale_records = 0
     try:
         for candidate in batch.candidates:
             existing = session.execute(
@@ -106,6 +118,9 @@ def import_access_analyzer_fixture(
                 )
                 .with_for_update()
             ).scalar_one_or_none()
+            if existing is not None and _is_stale(candidate, existing):
+                stale_records += 1
+                continue
             fields = _finding_fields(candidate)
             if existing is None:
                 session.add(
@@ -142,6 +157,7 @@ def import_access_analyzer_fixture(
         created_records=created_records,
         updated_records=updated_records,
         unchanged_records=unchanged_records,
+        stale_records=stale_records,
         invalid_records=batch.invalid_records,
         duplicate_records=batch.duplicate_records,
         truncated=batch.truncated,
