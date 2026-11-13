@@ -12,7 +12,7 @@ The page adapter accepts an injected boto3-compatible Access Analyzer client, bu
 
 The planned source is IAM Access Analyzer external-access findings. AWS documents `ListFindings` as the paginated operation for external-access analyzers; each page can provide a `nextToken`. The adapter requests pages with one configured analyzer ARN and never uses a mutating API. See the [ListFindings API](https://docs.aws.amazon.com/access-analyzer/latest/APIReference/API_ListFindings.html) and [FindingSummary fields](https://docs.aws.amazon.com/access-analyzer/latest/APIReference/API_FindingSummary.html).
 
-The reader caps page size at 100, findings per run at 1,000, and pages per run at 25. Repeated or invalid pagination tokens stop the preview with a sanitized error. The synthetic command defaults to a page size of two so the fixture exercises more than one page.
+The reader caps page size at 100, findings per run at 1,000, and pages per run at 25. Repeated or invalid pagination tokens stop the preview with a sanitized error. Synthetic resume offsets must be positive indices inside the fixture; zero, negative, malformed, and out-of-range offsets are rejected. The synthetic command defaults to a page size of two so the fixture exercises more than one page.
 
 ## Fields and minimization
 
@@ -24,6 +24,8 @@ The preview processes only the following fields from each finding:
 - `resource`, inspected in memory only to derive a Region from an ARN. It is never returned or persisted.
 
 Other provider fields, including resource-owner account, principal, action, conditions, and evidence details, are ignored. Invalid records contribute only to an `invalid_records` count. `valid_records` counts unique, valid findings; duplicate provider keys are reported separately. The report contains no finding identifiers or raw payloads.
+
+When a provider key appears more than once across pages, the preview and importer retain the newest normalized snapshot. Every extra occurrence still contributes to `duplicate_records`, so aggregate counts describe unique findings.
 
 ## Resource location and local priority
 
@@ -39,10 +41,18 @@ The fixture importer stores a SHA-256 key scoped to the analyzer in `source_even
 
 On repeat imports, the key and database uniqueness constraint prevent duplicate findings. Changed provider-derived fields update in place and increment the finding version. Analyst triage status, resolution reason, `updated_by`, notes, and audit events remain untouched. The application `updated_at` remains an application timestamp; provider timestamps are returned separately in the finding detail's `provider` object.
 
+## Provider freshness rule
+
+The lab orders snapshots by `updatedAt` first and `analyzedAt` second, comparing both as UTC instants. AWS documents these as the finding update time and policy analysis time respectively; see [FindingSummary](https://docs.aws.amazon.com/access-analyzer/latest/APIReference/API_FindingSummary.html). This ordering is a local import policy. A later provider update takes precedence even when its policy analysis time is earlier. When update times match, the later analysis time wins. Duplicate records with both timestamps equal retain the first occurrence in the batch.
+
+For an existing database row, an incoming snapshot with a lower timestamp pair is skipped and counted in `stale_records`. Skipping it leaves provider fields, local priority, analyst decisions, row version, and application update time untouched. New findings may still be inserted from the same batch. Equal timestamp pairs are eligible for field comparison: identical data is unchanged, while changed allowlisted data can be refreshed.
+
+`stale_records` is an aggregate in the persisted fixture-import report. The preview has no database comparison and does not report staleness. `writes_performed` remains the sum of created and updated rows; unchanged and stale rows perform zero writes. No raw identifiers are added to either report.
+
 ## Next implementation boundary
 
 Before any live read, explicitly approve the account and Region, analyzer, exact fields, role, database access list, retention period, and purge date. A future command may then construct a read-only AWS client through the normal temporary-credential provider chain. No live-read command is available today.
 
 ## Automated coverage
 
-The [regression suite](testing.md) covers bounded reads, malformed and duplicate findings, unchanged repeat imports, provider updates that preserve analyst decisions, transaction rollback, migrations, and viewer permissions. GitHub runs it against both SQLite and a disposable PostgreSQL service. These checks use fabricated fixtures and make no AWS calls.
+The [regression suite](testing.md) covers bounded reads, invalid fixture offsets, newest-duplicate selection, stale replays, unchanged repeat imports, provider updates that preserve analyst decisions, transaction rollback, migrations, and viewer permissions. GitHub runs it against both SQLite and a disposable PostgreSQL service. These checks use fabricated fixtures and make no AWS calls.

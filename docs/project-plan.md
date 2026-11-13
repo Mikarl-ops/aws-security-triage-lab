@@ -46,6 +46,8 @@ The map plots approximate positions for supported Region codes. Other codes rema
 - [x] Build and persist a stable provider key scoped to its analyzer for idempotent imports.
 - [x] Include synthetic dry-run aggregate counts and bounded handling for malformed records and pagination errors.
 - [x] Make repeated synthetic fixture imports idempotent and preserve analyst-owned fields.
+- [x] Reject invalid synthetic resume offsets and retain the newest duplicate snapshot across pages.
+- [x] Skip older provider snapshots during re-import and report aggregate stale-record counts.
 - [ ] Enable a real AWS client only after the account, Region, exact fields, access list, retention period, and purge date are explicitly approved.
 - [x] On provider updates, update provider-owned fields without overwriting analyst status, notes, resolution reasons, or audit events.
 - [x] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
@@ -59,6 +61,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 
 - [x] A bounded dry run reports aggregate counts and writes no findings.
 - [x] Importing the same fixture twice creates no duplicates or unnecessary updates.
+- [x] Replaying an older provider snapshot leaves newer provider data and row versions intact.
 - [x] A provider update changes only provider-owned and application-derived data.
 - [x] Analyst status, notes, resolution decisions, and audit history survive re-import.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.

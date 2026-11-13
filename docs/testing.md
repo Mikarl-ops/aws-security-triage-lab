@@ -21,16 +21,18 @@ The test harness never uses the application's `DATABASE_URL`. It supplies its ow
 
 | Area | Regression checks |
 |---|---|
-| Provider reads | Fixed analyzer, pagination forwarding, bounded page and batch sizes, repeated tokens, sanitized provider errors |
+| Provider reads | Fixed analyzer, pagination forwarding, bounded page and batch sizes, repeated tokens, invalid synthetic resume offsets, sanitized provider errors |
 | Normalization | Required fields, timezone-aware input, analyzer-scoped keys, regional/global/unknown resource placement |
 | Preview | Aggregate output, duplicate and malformed-record counts, no database setup, no raw identifiers in the report |
-| Persistence | Repeat imports perform zero writes; provider changes preserve analyst decisions, notes, and audit history |
+| Persistence | Repeat imports perform zero writes; newest duplicate snapshots win across pages; older replays are counted and skipped; provider changes preserve analyst decisions, notes, and audit history |
 | Transactions | Truncation writes nothing; a failure after flushing rolls back both changed and new findings |
 | Schema | Full migrations, model drift detection, complete provider-field constraints, downgrade/upgrade with existing synthetic rows |
 | Permissions | Authenticated viewers can read imported fields and receive a denial for status changes or notes with a valid CSRF token |
 | Fixture command | Explicit confirmation, development/local target guards, successful repeat imports on PostgreSQL |
 
 SQLite drops timezone markers when loading timestamps. The importer compares timestamp values as UTC instants so a database round trip does not turn an unchanged fixture into an update. PostgreSQL exercises the same invariant using its native timestamp handling.
+
+Freshness scenarios replay the baseline fixture after a newer provider update and check that provider fields, analyst status, resolution reason, row version, and application update time remain intact. Other cases verify update-time precedence, analysis-time tie-breaking, and latest-duplicate selection in either page order. The [importer notes](importer.md#provider-freshness-rule) define the local ordering policy.
 
 ## Run frontend checks locally
 

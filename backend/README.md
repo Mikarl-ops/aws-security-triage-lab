@@ -38,6 +38,8 @@ flask --app tracker:create_app access-analyzer-import-fixture --confirm-syntheti
 
 The import command accepts only the committed fixture, refuses non-development or non-local database targets, and never accesses AWS. Repeating it updates provider-owned fields in place while preserving analyst status, resolution reasons, notes, and audit history.
 
+The import report counts skipped older snapshots in `stale_records`; these records leave the current data and row version intact. Duplicate keys across pages retain the newest provider snapshot. The [freshness rule](../docs/importer.md#provider-freshness-rule) uses provider update time first, then policy analysis time.
+
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.
 
 ## Automated checks
