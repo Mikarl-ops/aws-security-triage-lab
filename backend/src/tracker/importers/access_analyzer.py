@@ -157,14 +157,15 @@ class FixtureAccessAnalyzerPageSource:
     def fetch_page(self, *, next_token: str | None, page_size: int) -> AccessAnalyzerPage:
         start = 0
         if next_token is not None:
-            if not next_token.startswith("fixture-offset:"):
+            if (
+                not isinstance(next_token, str)
+                or len(next_token) > 2048
+                or not re.fullmatch(r"fixture-offset:[1-9][0-9]*", next_token)
+            ):
                 raise PaginationError("The synthetic fixture received an invalid pagination token.")
-            try:
-                start = int(next_token.removeprefix("fixture-offset:"))
-            except ValueError:
-                raise PaginationError(
-                    "The synthetic fixture received an invalid pagination token."
-                ) from None
+            start = int(next_token.removeprefix("fixture-offset:"))
+            if start >= len(self._findings):
+                raise PaginationError("The synthetic fixture received an invalid pagination token.")
         end = min(start + page_size, len(self._findings))
         page = self._findings[start:end]
         next_page = f"fixture-offset:{end}" if end < len(self._findings) else None

@@ -83,6 +83,35 @@ def test_repeated_token_stops_pagination(analyzer_arn):
     assert len(client.requests) == 2
 
 
+@pytest.mark.parametrize(
+    "token",
+    [
+        "fixture-offset:-1",
+        "fixture-offset:0",
+        "fixture-offset:3",
+        "fixture-offset:999",
+        "fixture-offset: 1",
+        "fixture-offset:+1",
+        "fixture-offset:01",
+        "unexpected",
+        12,
+    ],
+)
+def test_fixture_rejects_invalid_resume_offsets(synthetic_payload, analyzer_arn, token):
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, synthetic_payload["findings"])
+    with pytest.raises(PaginationError, match="invalid pagination token"):
+        source.fetch_page(next_token=token, page_size=2)
+
+
+def test_fixture_resumes_at_the_next_unread_record(synthetic_payload, analyzer_arn):
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, synthetic_payload["findings"])
+    first = source.fetch_page(next_token=None, page_size=2)
+    last = source.fetch_page(next_token=first.next_token, page_size=2)
+    assert first.next_token == "fixture-offset:2"
+    assert last.findings == (synthetic_payload["findings"][2],)
+    assert last.next_token is None
+
+
 @pytest.mark.parametrize("limits", [{"max_findings": 1}, {"max_pages": 1}])
 def test_truncation_is_reported_for_each_limit(synthetic_payload, analyzer_arn, limits):
     source = FixtureAccessAnalyzerPageSource(analyzer_arn, synthetic_payload["findings"])
