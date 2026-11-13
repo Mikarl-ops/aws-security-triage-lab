@@ -38,6 +38,87 @@ def test_repeat_import_is_a_no_op(database_session):
     assert {row.id: (row.version, row.updated_at) for row in rows} == original
 
 
+def test_replaying_an_older_fixture_preserves_the_newer_provider_snapshot(database_session):
+    import_file(database_session)
+    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    finding = database_session.scalar(select(Finding).where(Finding.provider_status == "ARCHIVED"))
+    finding.status = "resolved"
+    finding.resolution_reason = "Synthetic analyst review retained during replay."
+    finding.version += 1
+    database_session.commit()
+    before = {
+        row.id: (
+            row.provider_status,
+            row.provider_is_public,
+            row.provider_updated_at,
+            row.provider_analyzed_at,
+            row.severity,
+            row.status,
+            row.resolution_reason,
+            row.version,
+            row.updated_at,
+        )
+        for row in database_session.scalars(select(Finding))
+    }
+    replay = import_file(database_session)
+    assert (replay.created_records, replay.updated_records, replay.unchanged_records) == (0, 0, 2)
+    assert replay.stale_records == 1
+    assert replay.writes_performed == 0
+    assert {
+        row.id: (
+            row.provider_status,
+            row.provider_is_public,
+            row.provider_updated_at,
+            row.provider_analyzed_at,
+            row.severity,
+            row.status,
+            row.resolution_reason,
+            row.version,
+            row.updated_at,
+        )
+        for row in database_session.scalars(select(Finding))
+    } == before
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("updatedAt", "2026-10-30T09:00:00Z"), ("analyzedAt", "2026-10-31T09:01:00Z")],
+)
+def test_older_provider_order_is_reported_without_a_write(
+    database_session, provider_update_payload, analyzer_arn, field, value
+):
+    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    older = dict(provider_update_payload["findings"][0], **{field: value}, status="ACTIVE")
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, [older])
+    result = import_access_analyzer_fixture(database_session, source, analyzer_arn=analyzer_arn)
+    assert result.stale_records == 1
+    assert result.writes_performed == 0
+    assert result.records_read == (
+        result.created_records
+        + result.updated_records
+        + result.unchanged_records
+        + result.stale_records
+        + result.invalid_records
+        + result.duplicate_records
+    )
+
+
+def test_provider_update_time_takes_precedence_over_analysis_time(
+    database_session, provider_update_payload, analyzer_arn
+):
+    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    newer_update = dict(
+        provider_update_payload["findings"][0],
+        status="RESOLVED",
+        updatedAt="2026-11-01T09:00:00Z",
+        analyzedAt="2026-10-30T09:05:00Z",
+    )
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, [newer_update])
+    result = import_access_analyzer_fixture(database_session, source, analyzer_arn=analyzer_arn)
+    assert result.updated_records == 1
+    assert result.stale_records == 0
+
+
 def test_provider_update_preserves_analyst_decisions_and_history(
     database_session, synthetic_payload, analyzer_arn
 ):

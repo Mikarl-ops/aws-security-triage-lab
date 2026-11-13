@@ -13,6 +13,7 @@ from tracker.importers.access_analyzer import (
     FixtureAccessAnalyzerPageSource,
     ImportSourceError,
     PaginationError,
+    collect_access_analyzer_candidates,
     normalize_access_analyzer_finding,
     read_findings_bounded,
     run_access_analyzer_preview,
@@ -81,6 +82,58 @@ def test_repeated_token_stops_pagination(analyzer_arn):
     with pytest.raises(PaginationError, match="repeated"):
         read_findings_bounded(AwsAccessAnalyzerPageSource(client, analyzer_arn))
     assert len(client.requests) == 2
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "fixture-offset:-1",
+        "fixture-offset:0",
+        "fixture-offset:3",
+        "fixture-offset:999",
+        "fixture-offset: 1",
+        "fixture-offset:+1",
+        "fixture-offset:01",
+        "unexpected",
+        12,
+    ],
+)
+def test_fixture_rejects_invalid_resume_offsets(synthetic_payload, analyzer_arn, token):
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, synthetic_payload["findings"])
+    with pytest.raises(PaginationError, match="invalid pagination token"):
+        source.fetch_page(next_token=token, page_size=2)
+
+
+def test_fixture_resumes_at_the_next_unread_record(synthetic_payload, analyzer_arn):
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, synthetic_payload["findings"])
+    first = source.fetch_page(next_token=None, page_size=2)
+    last = source.fetch_page(next_token=first.next_token, page_size=2)
+    assert first.next_token == "fixture-offset:2"
+    assert last.findings == (synthetic_payload["findings"][2],)
+    assert last.next_token is None
+
+
+@pytest.mark.parametrize("newest_first", [False, True])
+def test_duplicate_findings_keep_the_latest_provider_update_across_pages(
+    synthetic_payload, provider_update_payload, analyzer_arn, newest_first
+):
+    older = synthetic_payload["findings"][0]
+    newer = provider_update_payload["findings"][0]
+    records = [newer, older] if newest_first else [older, newer]
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, records)
+    preview = run_access_analyzer_preview(source, analyzer_arn=analyzer_arn, page_size=1)
+    assert (preview.valid_records, preview.duplicate_records) == (1, 1)
+    assert preview.by_provider_status == {"ARCHIVED": 1}
+    assert preview.by_local_priority == {"medium": 1}
+
+
+def test_duplicate_timestamp_ties_prefer_the_later_analysis(provider_update_payload, analyzer_arn):
+    latest = provider_update_payload["findings"][0]
+    older_analysis = dict(latest, status="ACTIVE", analyzedAt="2026-10-31T09:01:00Z")
+    source = FixtureAccessAnalyzerPageSource(analyzer_arn, [older_analysis, latest])
+    batch = collect_access_analyzer_candidates(source, analyzer_arn=analyzer_arn)
+    assert len(batch.candidates) == 1
+    assert batch.candidates[0].provider_status == "ARCHIVED"
 
 
 @pytest.mark.parametrize("limits", [{"max_findings": 1}, {"max_pages": 1}])

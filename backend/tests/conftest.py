@@ -30,6 +30,13 @@ def analyzer_arn(synthetic_payload):
 
 
 @pytest.fixture
+def provider_update_payload():
+    return json.loads(
+        (FIXTURE_DIR / "access-analyzer-provider-update.json").read_text(encoding="utf-8")
+    )
+
+
+@pytest.fixture
 def app(tmp_path):
     """Migrate a new SQLite file or a random schema in an explicit local test database."""
     test_url = os.environ.get("TEST_DATABASE_URL")

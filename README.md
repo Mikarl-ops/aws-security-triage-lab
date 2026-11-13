@@ -16,7 +16,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 
 The dashboard shows findings by resource type, findings over time, and resource locations classified as an AWS Region, global, or unknown. Analytics use the last 30 UTC calendar days and aggregate every matching finding, independent of table pagination. The map uses approximate positions for common Region codes; other codes remain in the count list. Source-IP geography is a separate concept and is not presented as resource location. See the [AWS Region reference](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html) for Region codes and geography.
 
-The first AWS source under consideration is IAM Access Analyzer external-access findings. The planned live reader will use bounded, read-only access and a field allowlist. The current synthetic importer supports a preview and idempotent writes that preserve analyst status, notes, and audit history. Its local triage rule assigns High priority to reported public access and Medium to other external access; this rule is explained in finding details.
+The first AWS source under consideration is IAM Access Analyzer external-access findings. The planned live reader will use bounded, read-only access and a field allowlist. The current synthetic importer supports a preview and idempotent writes that preserve analyst status, notes, and audit history. It selects the newest duplicate snapshot and skips older replays. Its local triage rule assigns High priority to reported public access and Medium to other external access; this rule is explained in finding details.
 
 See the evolving project documents:
 
