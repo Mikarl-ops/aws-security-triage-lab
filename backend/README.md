@@ -40,6 +40,20 @@ The import command accepts only the committed fixture, refuses non-development o
 
 The import report counts skipped older snapshots in `stale_records`; these records leave the current data and row version intact. Duplicate keys across pages retain the newest provider snapshot. The [freshness rule](../docs/importer.md#provider-freshness-rule) uses provider update time first, then policy analysis time.
 
+## Demonstrate synthetic provider history
+
+Apply migrations before starting the updated API. The new `provider_events` table stores allowlisted before/after values alongside finding changes. Run these commands from this directory:
+
+```text
+flask --app tracker:create_app db upgrade
+flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic
+flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic --scenario provider-update
+```
+
+The update scenario changes the S3 finding's provider status, public-access flag, and local priority, and introduces a synthetic queue finding. In the dashboard, open the S3 finding to view Provider history and Analyst activity separately. On a fresh database the S3 history includes its first import and refresh. Existing findings start recording new changes after the migration; no historical events are invented.
+
+Repeat the baseline command after the update to see the older S3 snapshot counted as stale. Repeated or stale records create no new history. The report's `writes_performed` counts finding rows; provider event rows are committed in the same transaction. The fixture command accepts named committed scenarios and refuses connection query overrides.
+
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.
 
 ## Automated checks
