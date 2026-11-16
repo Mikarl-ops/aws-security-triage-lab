@@ -11,7 +11,8 @@ from flask_login import current_user, login_required
 from sqlalchemy import case, func, select
 
 from ..extensions import db
-from ..models import AuditEvent, Finding, FindingNote, User
+from ..models import AuditEvent, Finding, FindingNote, ProviderEvent, User
+from ..provider_history import public_provider_changes
 from .common import iso_utc, json_object, pagination, parse_page_args, parse_rfc3339, problem
 
 bp = Blueprint("findings", __name__, url_prefix="/api/v1")
@@ -277,9 +278,7 @@ def analytics():
         .group_by(day_expression)
         .order_by(day_expression.asc())
     ).all()
-    total = db.session.scalar(
-        select(func.count()).select_from(Finding).where(*scoped_filters)
-    ) or 0
+    total = db.session.scalar(select(func.count()).select_from(Finding).where(*scoped_filters)) or 0
 
     day_counts = {start_day + timedelta(days=offset): 0 for offset in range(30)}
     for day_value, count in day_rows:
@@ -324,9 +323,7 @@ def region_analytics():
     ).all()
     by_scope = {"region": 0, "global": 0, "unknown": 0}
     by_scope.update({scope: count for scope, count in scope_rows})
-    total = db.session.scalar(
-        select(func.count()).select_from(Finding).where(*scoped_filters)
-    ) or 0
+    total = db.session.scalar(select(func.count()).select_from(Finding).where(*scoped_filters)) or 0
 
     return jsonify(
         window=window,
@@ -542,6 +539,49 @@ def list_history(finding_id: str):
                 "request_id": str(event.request_id) if event.request_id else None,
             }
             for event, username in rows
+        ],
+        **pagination(page, page_size, total),
+    )
+
+
+@bp.get("/findings/<finding_id>/provider-history")
+@login_required
+def list_provider_history(finding_id: str):
+    parsed_id = _parse_finding_id(finding_id)
+    if parsed_id is None or db.session.get(Finding, parsed_id) is None:
+        return problem(404, "Not found", "The requested finding does not exist.")
+    page, page_size, error = parse_page_args()
+    if error:
+        return error
+    query = select(ProviderEvent).where(ProviderEvent.finding_id == parsed_id)
+    total = (
+        db.session.scalar(
+            select(func.count())
+            .select_from(ProviderEvent)
+            .where(ProviderEvent.finding_id == parsed_id)
+        )
+        or 0
+    )
+    offset = (page - 1) * page_size
+    events = (
+        []
+        if offset >= total
+        else db.session.scalars(
+            query.order_by(ProviderEvent.finding_version.desc(), ProviderEvent.id.desc())
+            .offset(offset)
+            .limit(page_size)
+        ).all()
+    )
+    return jsonify(
+        items=[
+            {
+                "id": str(event.id),
+                "event_type": event.event_type,
+                "finding_version": event.finding_version,
+                "occurred_at": iso_utc(event.occurred_at),
+                "changes": public_provider_changes(event.changes),
+            }
+            for event in events
         ],
         **pagination(page, page_size, total),
     )
