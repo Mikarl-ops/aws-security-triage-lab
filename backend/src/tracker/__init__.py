@@ -60,6 +60,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "findings",
             "finding_notes",
             "audit_events",
+            "provider_events",
             "server_sessions",
             "auth_throttle_buckets",
         },

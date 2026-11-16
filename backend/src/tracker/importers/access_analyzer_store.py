@@ -9,7 +9,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Finding
+from ..models import Finding, ProviderEvent, utc_now
+from ..provider_history import provider_changes, provider_state
 from .access_analyzer import (
     AccessAnalyzerCandidate,
     AccessAnalyzerPageSource,
@@ -108,6 +109,7 @@ def import_access_analyzer_fixture(
     updated_records = 0
     unchanged_records = 0
     stale_records = 0
+    imported_at = utc_now()
     try:
         for candidate in batch.candidates:
             existing = session.execute(
@@ -123,16 +125,27 @@ def import_access_analyzer_fixture(
                 continue
             fields = _finding_fields(candidate)
             if existing is None:
+                created = Finding(
+                    source=SOURCE_NAME,
+                    source_event_id=candidate.provider_key,
+                    version=1,
+                    created_at=imported_at,
+                    updated_at=imported_at,
+                    **fields,
+                )
                 session.add(
-                    Finding(
-                        source=SOURCE_NAME,
-                        source_event_id=candidate.provider_key,
-                        **fields,
+                    ProviderEvent(
+                        finding=created,
+                        event_type="provider.imported",
+                        finding_version=1,
+                        occurred_at=imported_at,
+                        changes=provider_changes(None, provider_state(created)),
                     )
                 )
                 created_records += 1
                 continue
 
+            previous_state = provider_state(existing)
             changed = False
             for field, value in fields.items():
                 if not _equivalent_value(getattr(existing, field), value):
@@ -140,6 +153,18 @@ def import_access_analyzer_fixture(
                     changed = True
             if changed:
                 existing.version += 1
+                existing.updated_at = imported_at
+                changes = provider_changes(previous_state, provider_state(existing))
+                if changes:
+                    session.add(
+                        ProviderEvent(
+                            finding=existing,
+                            event_type="provider.updated",
+                            finding_version=existing.version,
+                            occurred_at=imported_at,
+                            changes=changes,
+                        )
+                    )
                 updated_records += 1
             else:
                 unchanged_records += 1

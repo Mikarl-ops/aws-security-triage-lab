@@ -25,10 +25,12 @@ def test_provider_migration_can_downgrade_and_upgrade(app):
     assert original_ids
     db.session.remove()
     downgrade(directory=migrations, revision="7f3a9b2c1d64")
+    assert not inspect(db.engine).has_table("provider_events")
     assert "provider_status" not in {
         column["name"] for column in inspect(db.engine).get_columns("findings")
     }
     upgrade(directory=migrations)
+    assert inspect(db.engine).has_table("provider_events")
     assert "provider_status" in {
         column["name"] for column in inspect(db.engine).get_columns("findings")
     }
