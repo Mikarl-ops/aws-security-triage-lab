@@ -29,6 +29,7 @@ The test harness never uses the application's `DATABASE_URL`. It supplies its ow
 | Schema | Full migrations, model drift detection, complete provider-field constraints, downgrade/upgrade with existing synthetic rows |
 | Permissions | Authenticated viewers can read imported fields and receive a denial for status changes or notes with a valid CSRF token |
 | Fixture command | Explicit confirmation, development/local target guards, successful repeat imports on PostgreSQL |
+| Provider history | Initial and refreshed before/after values; no history for unchanged/stale records; rollback with findings; unique finding versions; authenticated paging and value minimization |
 
 SQLite drops timezone markers when loading timestamps. The importer compares timestamp values as UTC instants so a database round trip does not turn an unchanged fixture into an update. PostgreSQL exercises the same invariant using its native timestamp handling.
 
@@ -46,7 +47,9 @@ npm test
 npm run build
 ```
 
-The dashboard tests cover independent provider and analyst status, the public-access flag, UTC provider timestamps, the absence of provider data, and provider context after an analyst update. They also cover priority filters sent through the existing API contract, authentication and viewer controls, safe text rendering, and analytics loading/error recovery. API responses are mocked, so these tests need no running backend. Server permission checks remain covered by the backend suite.
+The dashboard tests cover independent provider and analyst status, the public-access flag, UTC provider timestamps, the absence of provider data, and provider context after an analyst update. Provider history cases cover before/after values, older/newer pages, empty results, retries, expired sessions, and safe text rendering. Other tests cover priority filters sent through the existing API contract, authentication and viewer controls, and analytics loading/error recovery. API responses are mocked, so these tests need no running backend. Server permission checks remain covered by the backend suite.
+
+The confirmed fixture command's PostgreSQL test imports the committed baseline, repeats it, applies `--scenario provider-update`, and replays the stale baseline. Other command tests reject arbitrary scenario names and database connection query overrides before connecting.
 
 ## GitHub checks
 

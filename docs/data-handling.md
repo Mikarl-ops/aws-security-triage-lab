@@ -30,3 +30,5 @@ Record the approval and scope in the project notes before running the importer. 
 The local API uses session-based analyst and viewer roles. Enforce permissions on the server. Viewers are read-only; analyst changes must be version-checked and recorded in the same transaction as the audit event.
 
 Keep raw evidence minimized. Store only approved summaries needed for triage, and keep provider provenance and analyst decisions distinguishable.
+
+Synthetic provider history retains only the allowlisted status, public-access flag, local priority, resource type/location, and provider timestamps. It is stored locally with findings and follows the same data-handling boundary. The API exposes read-only, authenticated history pages and omits unsupported or nested change values. Any future live-data retention or purge procedure must also account for these history rows.

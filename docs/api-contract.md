@@ -74,6 +74,14 @@ The dashboard shows this context in a read-only section and formats its timestam
 
 Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts the same `status`, `severity`, and `source` filters as `/findings/analytics`; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
 
+### `GET /findings/{finding_id}/provider-history`
+
+Returns provider import and refresh events for one finding to authenticated viewers and analysts. Only `page` and `page_size` are accepted; pages are positive and page size is 1 to 100. Results use the standard paginated response and are ordered by finding version, newest first. Missing findings return 404; findings without recorded events return an empty page. No write route is available.
+
+Each item contains `id`, `event_type` (`provider.imported` or `provider.updated`), `finding_version`, `occurred_at` in UTC, and `changes`. Each change has `before` and `after` values. The allowlist includes provider status, public-access flag, local priority, resource type and location, and provider timestamps. Raw provider identifiers and payloads are excluded. Unsupported fields, nested values, and oversized strings are omitted from responses.
+
+Provider events are committed with the finding update. Repeated, stale, and failed imports create no persisted history. The history begins when the history migration is applied and a finding is imported or refreshed; earlier events are not reconstructed. The existing `/history` endpoint remains the analyst activity log.
+
 ## Analyst actions
 
 Status changes require the analyst role and an `expected_version`, and are written with an audit event. Notes also require the analyst role and create an audit event. Viewers can read findings but cannot change them. API error responses use a consistent problem shape and avoid returning internal exception details.

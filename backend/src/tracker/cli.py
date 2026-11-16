@@ -48,6 +48,10 @@ SEED_METADATA_FIELDS = {"account_id", "resource_id", "resource_type", "event_nam
 RESOURCE_LOCATION_SCOPES = {"region", "global", "unknown"}
 SEVERITIES = {"critical", "high", "medium", "low", "informational"}
 STATUSES = {"new", "investigating", "resolved", "dismissed"}
+ACCESS_ANALYZER_SCENARIOS = {
+    "baseline": "access-analyzer-findings.json",
+    "provider-update": "access-analyzer-provider-update.json",
+}
 
 
 def _seed_file() -> Path:
@@ -57,12 +61,14 @@ def _seed_file() -> Path:
     return Path(__file__).resolve().parents[3] / "database" / "seed" / "findings.json"
 
 
-def _access_analyzer_fixture_file() -> Path:
+def _access_analyzer_fixture_file(scenario: str = "baseline") -> Path:
+    if scenario not in ACCESS_ANALYZER_SCENARIOS:
+        raise ValueError("Choose a committed synthetic Access Analyzer scenario.")
     return (
         Path(__file__).resolve().parents[3]
         / "database"
         / "seed"
-        / "access-analyzer-findings.json"
+        / ACCESS_ANALYZER_SCENARIOS[scenario]
     )
 
 
@@ -81,10 +87,11 @@ def _require_local_development_database() -> None:
     if (
         database_url.drivername not in {"postgresql", "postgresql+psycopg"}
         or database_url.host not in local_hosts
+        or database_url.query
     ):
         raise click.ClickException(
             "The synthetic fixture import requires PostgreSQL on loopback or the local "
-            "Compose service."
+            "Compose service, without connection query overrides."
         )
 
 
@@ -263,6 +270,13 @@ def register_commands(app) -> None:
 
     @app.cli.command("access-analyzer-import-fixture")
     @click.option(
+        "--scenario",
+        type=click.Choice(tuple(ACCESS_ANALYZER_SCENARIOS)),
+        default="baseline",
+        show_default=True,
+        help="Committed synthetic finding scenario.",
+    )
+    @click.option(
         "--confirm-synthetic",
         is_flag=True,
         help="Confirm writing the committed synthetic fixture to the local development database.",
@@ -286,7 +300,7 @@ def register_commands(app) -> None:
         show_default=True,
     )
     def access_analyzer_import_fixture(
-        confirm_synthetic: bool, page_size: int, max_findings: int, max_pages: int
+        confirm_synthetic: bool, scenario: str, page_size: int, max_findings: int, max_pages: int
     ) -> None:
         """Persist only the committed synthetic fixture into a local development database."""
         if not confirm_synthetic:
@@ -295,7 +309,9 @@ def register_commands(app) -> None:
             )
         _require_local_development_database()
         try:
-            source = FixtureAccessAnalyzerPageSource.from_file(_access_analyzer_fixture_file())
+            source = FixtureAccessAnalyzerPageSource.from_file(
+                _access_analyzer_fixture_file(scenario)
+            )
             result = import_access_analyzer_fixture(
                 db.session,
                 source,

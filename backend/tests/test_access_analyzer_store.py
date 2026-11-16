@@ -1,10 +1,12 @@
 """Exercise real transactions and database constraints using fabricated records."""
 
+import json
+
 import pytest
 from sqlalchemy import event, func, select
 from sqlalchemy.exc import IntegrityError
 
-from conftest import FIXTURE_DIR, SEED_FILE
+from conftest import FIXTURE_DIR, PROVIDER_UPDATE_FILE, SEED_FILE
 from tracker.importers.access_analyzer import (
     FixtureAccessAnalyzerPageSource,
     normalize_access_analyzer_finding,
@@ -13,7 +15,7 @@ from tracker.importers.access_analyzer_store import (
     ImportPersistenceError,
     import_access_analyzer_fixture,
 )
-from tracker.models import AuditEvent, Finding, FindingNote, User
+from tracker.models import AuditEvent, Finding, FindingNote, ProviderEvent, User
 
 
 def import_file(session, path=SEED_FILE, **limits):
@@ -36,11 +38,67 @@ def test_repeat_import_is_a_no_op(database_session):
     )
     assert repeated.writes_performed == 0
     assert {row.id: (row.version, row.updated_at) for row in rows} == original
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 3
+
+
+def test_provider_events_retain_only_changed_allowlisted_values(
+    database_session, synthetic_payload, analyzer_arn
+):
+    import_file(database_session)
+    key = normalize_access_analyzer_finding(
+        analyzer_arn, synthetic_payload["findings"][0]
+    ).provider_key
+    finding = database_session.scalar(select(Finding).where(Finding.source_event_id == key))
+    original_event = finding.provider_events[0]
+    original_changes = dict(original_event.changes)
+    assert original_event.event_type == "provider.imported"
+    assert original_event.finding_version == 1
+    assert original_event.changes["provider_status"] == {"before": None, "after": "ACTIVE"}
+
+    import_file(database_session, PROVIDER_UPDATE_FILE)
+    database_session.expire(finding, ["provider_events"])
+    events = finding.provider_events
+    assert len(events) == 2
+    assert events[0].changes == original_changes
+    assert events[1].event_type == "provider.updated"
+    assert events[1].finding_version == finding.version == 2
+    assert events[1].changes["provider_status"] == {"before": "ACTIVE", "after": "ARCHIVED"}
+    assert events[1].changes["is_public"] == {"before": True, "after": False}
+    assert events[1].changes["priority"] == {"before": "high", "after": "medium"}
+    assert set(events[1].changes) == {
+        "provider_status",
+        "is_public",
+        "priority",
+        "provider_updated_at",
+        "provider_analyzed_at",
+    }
+    history_json = json.dumps([item.changes for item in events])
+    assert "arn:" not in history_json
+    assert "synthetic-access-analyzer" not in history_json
+    assert "000000000000" not in history_json
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 5
+
+
+def test_provider_event_versions_are_unique(database_session):
+    import_file(database_session)
+    finding = database_session.scalar(select(Finding))
+    database_session.add(
+        ProviderEvent(
+            finding_id=finding.id,
+            finding_version=1,
+            event_type="provider.updated",
+            changes={},
+        )
+    )
+    with pytest.raises(IntegrityError):
+        database_session.flush()
+    database_session.rollback()
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 3
 
 
 def test_replaying_an_older_fixture_preserves_the_newer_provider_snapshot(database_session):
     import_file(database_session)
-    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    import_file(database_session, PROVIDER_UPDATE_FILE)
     finding = database_session.scalar(select(Finding).where(Finding.provider_status == "ARCHIVED"))
     finding.status = "resolved"
     finding.resolution_reason = "Synthetic analyst review retained during replay."
@@ -64,6 +122,7 @@ def test_replaying_an_older_fixture_preserves_the_newer_provider_snapshot(databa
     assert (replay.created_records, replay.updated_records, replay.unchanged_records) == (0, 0, 2)
     assert replay.stale_records == 1
     assert replay.writes_performed == 0
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 5
     assert {
         row.id: (
             row.provider_status,
@@ -87,7 +146,7 @@ def test_replaying_an_older_fixture_preserves_the_newer_provider_snapshot(databa
 def test_older_provider_order_is_reported_without_a_write(
     database_session, provider_update_payload, analyzer_arn, field, value
 ):
-    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    import_file(database_session, PROVIDER_UPDATE_FILE)
     older = dict(provider_update_payload["findings"][0], **{field: value}, status="ACTIVE")
     source = FixtureAccessAnalyzerPageSource(analyzer_arn, [older])
     result = import_access_analyzer_fixture(database_session, source, analyzer_arn=analyzer_arn)
@@ -106,7 +165,7 @@ def test_older_provider_order_is_reported_without_a_write(
 def test_provider_update_time_takes_precedence_over_analysis_time(
     database_session, provider_update_payload, analyzer_arn
 ):
-    import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    import_file(database_session, PROVIDER_UPDATE_FILE)
     newer_update = dict(
         provider_update_payload["findings"][0],
         status="RESOLVED",
@@ -147,7 +206,7 @@ def test_provider_update_preserves_analyst_decisions_and_history(
     database_session.commit()
     original = (finding.id, finding.created_at, finding.version, note.id, audit.id, audit.details)
 
-    result = import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    result = import_file(database_session, PROVIDER_UPDATE_FILE)
     database_session.refresh(finding)
     assert (result.created_records, result.updated_records) == (1, 1)
     assert finding.provider_status == "ARCHIVED"
@@ -165,7 +224,7 @@ def test_provider_update_preserves_analyst_decisions_and_history(
     assert [(item.id, item.details) for item in finding.audit_events] == [
         (original[4], original[5])
     ]
-    repeated = import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+    repeated = import_file(database_session, PROVIDER_UPDATE_FILE)
     assert repeated.unchanged_records == 2
     assert repeated.writes_performed == 0
 
@@ -193,6 +252,7 @@ def test_truncated_batches_write_nothing(database_session, limits):
     with pytest.raises(ImportPersistenceError, match="no findings were written"):
         import_file(database_session, **limits)
     assert database_session.scalar(select(func.count()).select_from(Finding)) == 0
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 0
 
 
 def test_failed_commit_rolls_back_updates_and_inserts(database_session):
@@ -209,7 +269,7 @@ def test_failed_commit_rolls_back_updates_and_inserts(database_session):
     event.listen(database_session, "before_commit", fail_after_writes)
     try:
         with pytest.raises(ImportPersistenceError) as error:
-            import_file(database_session, FIXTURE_DIR / "access-analyzer-provider-update.json")
+            import_file(database_session, PROVIDER_UPDATE_FILE)
     finally:
         event.remove(database_session, "before_commit", fail_after_writes)
     assert "synthetic-sensitive" not in str(error.value)
@@ -218,3 +278,4 @@ def test_failed_commit_rolls_back_updates_and_inserts(database_session):
         row.id: (row.provider_status, row.provider_is_public, row.version)
         for row in database_session.scalars(select(Finding))
     } == before
+    assert database_session.scalar(select(func.count()).select_from(ProviderEvent)) == 3

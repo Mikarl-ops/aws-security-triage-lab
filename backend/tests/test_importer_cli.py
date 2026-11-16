@@ -31,11 +31,28 @@ def test_fixture_import_requires_explicit_confirmation(command_app):
     assert "--confirm-synthetic" in result.output
 
 
+def test_fixture_scenario_must_be_a_committed_choice(command_app):
+    result = command_app.test_cli_runner().invoke(
+        args=[
+            "access-analyzer-import-fixture",
+            "--confirm-synthetic",
+            "--scenario",
+            "../../untrusted.json",
+        ]
+    )
+    assert result.exit_code != 0
+    assert "Invalid value for '--scenario'" in result.output
+
+
 @pytest.mark.parametrize(
     "environment,uri",
     [
         ("production", "postgresql+psycopg://localhost/triage_lab_test"),
         ("development", "postgresql+psycopg://synthetic-remote.invalid/triage_lab_test"),
+        (
+            "development",
+            "postgresql+psycopg://localhost/triage_lab_test?host=synthetic-remote.invalid",
+        ),
         ("development", "sqlite:///:memory:"),
     ],
 )

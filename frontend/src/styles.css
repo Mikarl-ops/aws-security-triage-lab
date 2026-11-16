@@ -917,6 +917,12 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
 .note-meta strong, .timeline strong { font-size: 0.79rem; }
 .detail-section > .readonly-copy { color: var(--blue); }
 
+.provider-change-list { display: grid; gap: 8px; margin: 10px 0 0; }
+.provider-change-list dt { color: var(--muted); font-size: 0.72rem; }
+.provider-change-list dd { margin: 2px 0 0; font-size: 0.8rem; overflow-wrap: anywhere; }
+.provider-history-pages { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.provider-history-pages > span, .provider-history-error { font-size: 0.8rem; color: var(--muted); }
+
 .timeline {
   display: grid;
   gap: 12px;

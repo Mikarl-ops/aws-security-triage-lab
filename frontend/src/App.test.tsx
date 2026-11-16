@@ -29,6 +29,7 @@ vi.mock("./api", async (importOriginal) => {
       getFinding: vi.fn(),
       listNotes: vi.fn(),
       listHistory: vi.fn(),
+      listProviderHistory: vi.fn(),
       changeStatus: vi.fn(),
       addNote: vi.fn(),
     },
@@ -55,6 +56,7 @@ function summarize(findings: Finding[]): FindingSummary {
 }
 
 beforeEach(() => {
+  mockedApi.listProviderHistory.mockResolvedValue({ items: [], page: 1, page_size: 25, total: 0, pages: 1 });
   vi.clearAllMocks();
   serverFindings = demoFindings.map((finding) => ({ ...finding }));
   serverNotes = Object.fromEntries(
@@ -238,8 +240,10 @@ describe("API-connected findings workbench", () => {
     const context = await screen.findByRole("region", { name: "Provider context" });
     expect(within(context).getByText("Archived")).toBeInTheDocument();
     expect(screen.getByText("Analyst status: New")).toBeInTheDocument();
+    await screen.findByText("No provider changes have been recorded for this finding.");
     fireEvent.click(screen.getByRole("button", { name: "Save status" }));
     await screen.findByText("Analyst status: Investigating");
+    await waitFor(() => expect(mockedApi.listProviderHistory).toHaveBeenCalledTimes(2));
     expect(within(screen.getByRole("region", { name: "Provider context" }))
       .getByText("Archived")).toBeInTheDocument();
     expect(serverFindings[0].provider).toEqual(finding.provider);

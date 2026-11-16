@@ -137,6 +137,37 @@ class Finding(db.Model):
     audit_events = db.relationship(
         "AuditEvent", back_populates="finding", order_by="AuditEvent.occurred_at"
     )
+    provider_events = db.relationship(
+        "ProviderEvent", back_populates="finding", order_by="ProviderEvent.finding_version"
+    )
+
+
+class ProviderEvent(db.Model):
+    """Allowlisted provider changes recorded in the same transaction as an import."""
+
+    __tablename__ = "provider_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('provider.imported', 'provider.updated')", name="valid_event_type"
+        ),
+        CheckConstraint("finding_version > 0", name="positive_finding_version"),
+        UniqueConstraint(
+            "finding_id", "finding_version", name="uq_provider_events_finding_version"
+        ),
+    )
+
+    id = db.Column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    finding_id = db.Column(
+        Uuid(as_uuid=True), db.ForeignKey("findings.id", ondelete="RESTRICT"), nullable=False
+    )
+    event_type = db.Column(String(32), nullable=False)
+    finding_version = db.Column(db.Integer, nullable=False)
+    occurred_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=utc_now, server_default=db.func.now()
+    )
+    changes = db.Column(JSON_OBJECT, nullable=False)
+
+    finding = db.relationship("Finding", back_populates="provider_events")
 
 
 class FindingNote(db.Model):

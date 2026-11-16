@@ -18,6 +18,22 @@ export interface FindingProvider {
   analyzed_at: string;
 }
 
+export type ProviderChangeField =
+  | "provider_status" | "is_public" | "priority" | "resource_type"
+  | "resource_location_scope" | "resource_region"
+  | "provider_created_at" | "provider_updated_at" | "provider_analyzed_at";
+
+export interface ProviderEvent {
+  id: string;
+  event_type: "provider.imported" | "provider.updated";
+  finding_version: number;
+  occurred_at: string;
+  changes: Partial<Record<ProviderChangeField, {
+    before: string | boolean | null;
+    after: string | boolean | null;
+  }>>;
+}
+
 export interface Finding {
   id: string;
   title: string;

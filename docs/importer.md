@@ -4,7 +4,7 @@
 
 `flask --app tracker:create_app access-analyzer-preview` reads only `database/seed/access-analyzer-findings.json`. It paginates the synthetic fixture, normalizes an allowlist, and prints aggregate counts. The command makes no AWS calls, performs no database reads or writes, and reports `writes_performed: 0`.
 
-`flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic` writes only that committed synthetic fixture to PostgreSQL. It runs only when `APP_ENV=development` and the database host is loopback or the local Compose `db` service. It never creates an AWS client. Apply migrations first. If configured limits would truncate the fixture, the command aborts without writing; malformed and duplicate records are skipped and counted.
+`flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic` writes only a named committed synthetic fixture to PostgreSQL. The default `--scenario baseline` uses `access-analyzer-findings.json`; `--scenario provider-update` uses `access-analyzer-provider-update.json`. It runs only when `APP_ENV=development` and the database host is loopback or the local Compose `db` service, with no connection query overrides. It never creates an AWS client. Apply migrations first. If configured limits would truncate the fixture, the command aborts without writing; malformed records are skipped and duplicate keys are combined and counted.
 
 The page adapter accepts an injected boto3-compatible Access Analyzer client, but the application and preview command do not create that client or resolve AWS credentials. No live-read mode is enabled or authorized.
 
@@ -47,7 +47,17 @@ The lab orders snapshots by `updatedAt` first and `analyzedAt` second, comparing
 
 For an existing database row, an incoming snapshot with a lower timestamp pair is skipped and counted in `stale_records`. Skipping it leaves provider fields, local priority, analyst decisions, row version, and application update time untouched. New findings may still be inserted from the same batch. Equal timestamp pairs are eligible for field comparison: identical data is unchanged, while changed allowlisted data can be refreshed.
 
-`stale_records` is an aggregate in the persisted fixture-import report. The preview has no database comparison and does not report staleness. `writes_performed` remains the sum of created and updated rows; unchanged and stale rows perform zero writes. No raw identifiers are added to either report.
+`stale_records` is an aggregate in the persisted fixture-import report. The preview has no database comparison and does not report staleness. `writes_performed` remains the sum of created and updated finding rows; unchanged and stale rows perform zero writes. No raw identifiers are added to either report.
+
+## Provider change history
+
+The history migration adds `provider_events`. A new finding records `provider.imported`; a refresh that changes tracked provider values records `provider.updated`. The event and finding are committed together, and a failure rolls back both. Each event records the finding version, local import time in UTC, and changed values as `before`/`after` pairs.
+
+The tracked fields are `provider_status`, `is_public`, `priority`, `resource_type`, `resource_location_scope`, `resource_region`, `provider_created_at`, `provider_updated_at`, and `provider_analyzed_at`. Generated descriptions, raw provider payloads, analyzer ARNs, raw finding/resource identifiers, principals, and credentials are excluded. The application appends events and offers no editing route. Analyst notes, resolution decisions, and audit events retain their existing ownership.
+
+Identical repeats, stale records, invalid records, and truncated imports add no provider events. A refresh that only changes generated display text does not create a provider-state event. Existing findings receive no fabricated backfill; the drawer can correctly show an empty provider history until a later change is recorded.
+
+Authenticated viewers and analysts read this history through `/api/v1/findings/{id}/provider-history`. Results are ordered by finding version, newest first. The drawer shows the before/after values with controls for older and newer pages, separately from Analyst activity. The named update scenario supports a reproducible [local demonstration](../backend/README.md#demonstrate-synthetic-provider-history).
 
 ## Next implementation boundary
 

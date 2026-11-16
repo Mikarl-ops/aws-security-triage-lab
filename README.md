@@ -8,6 +8,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - The dashboard and this repository's Flask/PostgreSQL API use synthetic findings.
 - The API includes session-based analyst/viewer roles, notes, audit history, and filtered analytics endpoints.
 - Finding details show provider status, public access, and timestamps separately from analyst status. The dashboard labels application-assigned values as triage priority.
+- Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
 - The importer supports a bounded synthetic preview and a confirmed local fixture import; no live AWS connection is available.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.
@@ -42,6 +43,15 @@ docker compose exec api flask --app tracker:create_app create-user analyst --rol
 ```
 
 Open <http://127.0.0.1:5173> and sign in. The Compose services bind to host loopback and load fabricated findings only. For a non-Compose setup, see [backend setup](backend/README.md).
+
+To demonstrate provider change history, import the committed Access Analyzer baseline followed by its update scenario:
+
+```text
+docker compose exec api flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic
+docker compose exec api flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic --scenario provider-update
+```
+
+Open `External access: AWS::S3::Bucket` to compare the recorded provider values. Close and reopen its details after running an import. History starts with changes recorded after the history migration; existing findings may have no earlier events. Both commands use fabricated findings only.
 
 Theme colors, fonts, surfaces, and responsive breakpoints are in [styles.css](frontend/src/styles.css). GitHub runs frontend lint, tests, and a production build, alongside the backend database checks. Local commands are in the [testing guide](docs/testing.md).
 

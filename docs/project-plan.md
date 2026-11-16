@@ -8,6 +8,8 @@ Build a local analyst queue that can ingest a small, approved set of AWS securit
 
 ## Pilot boundary
 
+The current development milestone remains entirely synthetic. Live pilot work is deferred until an explicit scope is agreed.
+
 - One approved sandbox AWS account and one Region.
 - Local React, Flask, and PostgreSQL components.
 - Read-only provider access through temporary credentials.
@@ -53,7 +55,15 @@ The map plots approximate positions for supported Region codes. Other codes rema
 - [x] Add fabricated fixtures and automated checks for duplicate, provider-update, and failed-transaction scenarios.
 - [x] Run migrations, ownership checks, and fixture-command checks against a disposable PostgreSQL service in CI.
 
-### 4. Controlled live pilot
+### 4. Synthetic provider history
+
+- [x] Record allowlisted provider changes in the same transaction as finding imports.
+- [x] Keep provider change records separate from analyst activity and preserve existing records on replay.
+- [x] Expose authenticated, read-only history pages and display before/after values in the drawer.
+- [x] Provide committed baseline and update scenarios for a reproducible local demonstration.
+- [x] Cover history minimization, pagination, access, retry, stale/no-op imports, and rollback in automated checks.
+
+### 5. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -64,6 +74,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Replaying an older provider snapshot leaves newer provider data and row versions intact.
 - [x] A provider update changes only provider-owned and application-derived data.
 - [x] Analyst status, notes, resolution decisions, and audit history survive re-import.
+- [x] Provider changes retain a paged history that survives alongside analyst activity.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
