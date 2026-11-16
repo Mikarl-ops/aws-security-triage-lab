@@ -17,6 +17,7 @@ from tracker.extensions import db
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
 SEED_FILE = BACKEND_DIR.parent / "database" / "seed" / "access-analyzer-findings.json"
+PROVIDER_UPDATE_FILE = SEED_FILE.with_name("access-analyzer-provider-update.json")
 
 
 @pytest.fixture
@@ -31,9 +32,7 @@ def analyzer_arn(synthetic_payload):
 
 @pytest.fixture
 def provider_update_payload():
-    return json.loads(
-        (FIXTURE_DIR / "access-analyzer-provider-update.json").read_text(encoding="utf-8")
-    )
+    return json.loads(PROVIDER_UPDATE_FILE.read_text(encoding="utf-8"))
 
 
 @pytest.fixture

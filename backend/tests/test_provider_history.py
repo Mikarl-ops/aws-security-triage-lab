@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
-from conftest import FIXTURE_DIR, SEED_FILE
+from conftest import PROVIDER_UPDATE_FILE, SEED_FILE
 from tracker.importers.access_analyzer import (
     FixtureAccessAnalyzerPageSource,
     normalize_access_analyzer_finding,
@@ -16,7 +16,7 @@ from tracker.models import Finding, ProviderEvent, User
 
 @pytest.fixture
 def history_finding(database_session, synthetic_payload, analyzer_arn):
-    for path in (SEED_FILE, FIXTURE_DIR / "access-analyzer-provider-update.json"):
+    for path in (SEED_FILE, PROVIDER_UPDATE_FILE):
         source = FixtureAccessAnalyzerPageSource.from_file(path)
         import_access_analyzer_fixture(database_session, source, analyzer_arn=source.analyzer_arn)
     key = normalize_access_analyzer_finding(

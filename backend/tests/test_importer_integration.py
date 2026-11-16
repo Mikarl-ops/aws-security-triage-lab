@@ -98,3 +98,11 @@ def test_confirmed_fixture_cli_import_is_idempotent_on_postgresql(app):
     repeated = runner.invoke(args=args)
     assert repeated.exit_code == 0, repeated.output
     assert json.loads(repeated.output)["writes_performed"] == 0
+    updated = runner.invoke(args=[*args, "--scenario", "provider-update"])
+    assert updated.exit_code == 0, updated.output
+    report = json.loads(updated.output)
+    assert (report["created_records"], report["updated_records"]) == (1, 1)
+    replay = runner.invoke(args=args)
+    assert replay.exit_code == 0, replay.output
+    assert json.loads(replay.output)["stale_records"] == 1
+    assert json.loads(replay.output)["writes_performed"] == 0
