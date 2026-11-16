@@ -9,6 +9,7 @@ import type {
   FindingStatus,
   FindingSummary,
   PageResponse,
+  ProviderEvent,
   SessionUser,
 } from "./types";
 
@@ -144,6 +145,13 @@ export const api = {
 
   listHistory(findingId: string) {
     return request<PageResponse<AuditEvent>>(`/findings/${encodeURIComponent(findingId)}/history`);
+  },
+
+  listProviderHistory(findingId: string, page = 1) {
+    const params = new URLSearchParams({ page: String(page), page_size: "25" });
+    return request<PageResponse<ProviderEvent>>(
+      `/findings/${encodeURIComponent(findingId)}/provider-history?${params.toString()}`,
+    );
   },
 
   changeStatus(

@@ -5,6 +5,8 @@ import { formatDate } from "../presentation";
 import type { Finding, FindingProvider } from "../types";
 import { FindingDetails } from "./FindingDetails";
 
+vi.mock("./ProviderHistory", () => ({ ProviderHistory: () => null }));
+
 const syntheticProvider: FindingProvider = {
   status: "ARCHIVED",
   is_public: false,

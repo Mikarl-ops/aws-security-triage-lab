@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { AuditEvent, Finding, FindingNote, FindingStatus } from "../types";
 import { allowedTransitions, formatDate, severityLabels, statusLabels } from "../presentation";
 import { ProviderContext } from "./ProviderContext";
+import { ProviderHistory } from "./ProviderHistory";
 
 interface FindingDetailsProps {
   finding: Finding | null;
@@ -143,6 +144,7 @@ export function FindingDetails({
               </section>
 
               {finding.provider && <ProviderContext provider={finding.provider} />}
+              {finding.provider && <ProviderHistory key={`${finding.id}-${finding.version}`} findingId={finding.id} onReloadFinding={onRetry} />}
 
               {canUpdate && choices.length > 0 && (
                 <section className="detail-section action-section">
@@ -229,7 +231,7 @@ export function FindingDetails({
 
               <section className="detail-section">
                 <div className="section-heading-row">
-                  <h3>Activity history</h3>
+                  <h3>Analyst activity</h3>
                   <span className="section-count">{history.length}</span>
                 </div>
                 {history.length ? (

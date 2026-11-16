@@ -18,6 +18,16 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it("reads provider-history pages with same-origin credentials", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [], page: 2, page_size: 25, total: 0, pages: 1 }));
+    await api.listProviderHistory("synthetic/finding", 2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/findings/synthetic%2Ffinding/provider-history?page=2&page_size=25",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it("uses same-origin cookies and server-side filters for findings", async () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValueOnce(
