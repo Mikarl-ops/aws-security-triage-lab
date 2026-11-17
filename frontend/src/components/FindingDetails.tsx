@@ -31,12 +31,11 @@ export function FindingDetails({
   onChangeStatus,
   onAddNote,
 }: FindingDetailsProps) {
-  const [nextStatus, setNextStatus] = useState<FindingStatus | "">(() =>
-    finding ? allowedTransitions[finding.status][0] ?? "" : "",
-  );
+  const [statusDraft, setStatusDraft] = useState<FindingStatus | "">("");
   const [resolutionReason, setResolutionReason] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const choices = finding ? allowedTransitions[finding.status] : [];
+  const nextStatus = statusDraft && choices.includes(statusDraft) ? statusDraft : choices[0] ?? "";
   const needsResolutionReason = nextStatus === "resolved" || nextStatus === "dismissed";
 
   async function submitStatus(event: FormEvent<HTMLFormElement>) {
@@ -154,7 +153,7 @@ export function FindingDetails({
                       <span>Move to</span>
                       <select
                         aria-label="Move finding to status"
-                        onChange={(event) => setNextStatus(event.target.value as FindingStatus)}
+                        onChange={(event) => setStatusDraft(event.target.value as FindingStatus)}
                         value={nextStatus}
                       >
                         {choices.map((status) => (
@@ -175,7 +174,7 @@ export function FindingDetails({
                         />
                       </label>
                     )}
-                    <button className="secondary-button" disabled={busy || !nextStatus} type="submit">
+                    <button className="secondary-button" disabled={busy || loading || !nextStatus} type="submit">
                       {busy ? "Saving…" : "Save status"}
                     </button>
                   </form>
@@ -219,7 +218,7 @@ export function FindingDetails({
                     </label>
                     <div className="note-form-footer">
                       <span>{noteBody.length}/4,000</span>
-                      <button className="secondary-button" disabled={busy || !noteBody.trim()} type="submit">
+                      <button className="secondary-button" disabled={busy || loading || !noteBody.trim()} type="submit">
                         {busy ? "Saving…" : "Add note"}
                       </button>
                     </div>

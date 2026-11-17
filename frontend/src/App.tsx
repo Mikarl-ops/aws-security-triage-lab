@@ -375,8 +375,14 @@ export function App() {
         setSelectedId(null);
         setAuthError("Your session has expired. Sign in again to continue.");
       } else {
-        setMutationError(friendlyError(error));
+        setMutationError(error instanceof ApiError && error.status === 409
+          ? "The finding changed. Your draft has been kept. Review the refreshed details before saving again."
+          : friendlyError(error));
         if (error instanceof ApiError && error.status === 409) {
+          setDashboardLoading(true);
+          setDashboardError(null);
+          prepareAnalyticsRefresh();
+          setRefreshToken((token) => token + 1);
           setDetailLoading(true);
           setDetailError(null);
           setDetailReload((revision) => revision + 1);
@@ -608,7 +614,7 @@ export function App() {
 
       {selectedId && (
         <FindingDetails
-          key={`${selectedId}-${findingDetail?.version ?? "loading"}`}
+          key={selectedId}
           busy={mutationBusy}
           canUpdate={user.role === "analyst"}
           error={mutationError ?? detailError}

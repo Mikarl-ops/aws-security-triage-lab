@@ -223,6 +223,51 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("keeps review drafts while refreshing after a provider-version conflict", async () => {
+    const finding = serverFindings[1];
+    const initialStatusEvents = serverHistory[finding.id].filter((event) => event.event_type === "finding.status_changed").length;
+    finding.source = "aws-access-analyzer";
+    finding.provider = {
+      status: "ACTIVE", is_public: true,
+      created_at: "2026-10-30T08:00:00Z", updated_at: "2026-10-30T09:00:00Z",
+      analyzed_at: "2026-10-30T09:05:00Z",
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByRole("heading", { name: finding.title });
+    const reason = "Synthetic resolution draft retained across a provider update.";
+    const note = "Synthetic note draft retained across the same update.";
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: reason } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: note } });
+    const refreshed: Finding = {
+      ...finding, version: finding.version + 1, severity: "medium",
+      provider: { ...finding.provider, status: "ARCHIVED", is_public: false, updated_at: "2026-10-31T09:00:00Z" },
+    };
+    serverFindings[1] = refreshed;
+    let finishReload: (value: Finding) => void = () => {};
+    mockedApi.getFinding.mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText(/Your draft has been kept/);
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Save status" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    expect(mockedApi.changeStatus).toHaveBeenCalledTimes(1);
+    await act(async () => { finishReload(refreshed); });
+    await screen.findByText("Archived");
+    expect(screen.getByRole("combobox", { name: "Move finding to status" })).toHaveValue("resolved");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save status" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Resolved");
+    expect(mockedApi.changeStatus).toHaveBeenNthCalledWith(1, finding.id, "resolved", finding.version, reason);
+    expect(mockedApi.changeStatus).toHaveBeenNthCalledWith(2, finding.id, "resolved", refreshed.version, reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    expect(serverHistory[finding.id].filter((event) => event.event_type === "finding.status_changed")).toHaveLength(initialStatusEvents + 1);
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+  });
+
   it.each(["status", "note"] as const)("keeps the queue usable after a failed %s save", async (action) => {
     const failure = new ApiError(503, { detail: "Synthetic save failed." });
     if (action === "status") mockedApi.changeStatus.mockRejectedValueOnce(failure);
