@@ -9,6 +9,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - The API includes session-based analyst/viewer roles, notes, audit history, and filtered analytics endpoints.
 - Finding details show provider status, public access, and timestamps separately from analyst status. The dashboard labels application-assigned values as triage priority.
 - Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
+- Open reviews keep unsaved text across refreshes and version conflicts, and require an explicit save after the analyst reviews the refreshed details.
 - The importer supports a bounded synthetic preview and a confirmed local fixture import; no live AWS connection is available.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.
@@ -26,6 +27,7 @@ See the evolving project documents:
 - [API contract](docs/api-contract.md)
 - [Importer notes](docs/importer.md)
 - [Automated checks](docs/testing.md)
+- [Review recovery and synthetic walkthrough](docs/review-workflow.md)
 - [Data handling and authorization](docs/data-handling.md)
 
 ## Preview the dashboard

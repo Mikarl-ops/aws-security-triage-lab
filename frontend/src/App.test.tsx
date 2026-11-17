@@ -223,6 +223,141 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("requires a successful details reload after a conflict refresh fails", async () => {
+    const finding = serverFindings[1];
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByRole("heading", { name: finding.title });
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: "Synthetic retained resolution." } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: "Synthetic retained note." } });
+    mockedApi.changeStatus.mockRejectedValueOnce(new ApiError(409, { detail: "Synthetic version conflict." }));
+    mockedApi.getFinding.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic reload failed." }));
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Synthetic reload failed.");
+    expect(screen.getByRole("button", { name: "Save status" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add note" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue("Synthetic retained resolution.");
+    fireEvent.click(screen.getByRole("button", { name: "Reload details" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save status" })).toBeEnabled());
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue("Synthetic retained note.");
+    expect(mockedApi.changeStatus).toHaveBeenCalledTimes(1);
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Resolved");
+  });
+
+  it.each([
+    { action: "status", outcome: "success", reopen: false },
+    { action: "status", outcome: "failure", reopen: false },
+    { action: "note", outcome: "success", reopen: false },
+    { action: "note", outcome: "failure", reopen: true },
+  ] as const)("isolates a delayed $action $outcome from the next review (reopen=$reopen)", async ({ action, outcome, reopen }) => {
+    const original = serverFindings[0];
+    const next = reopen ? original : serverFindings[1];
+    let finishSave: () => Promise<void> = async () => {};
+    const failure = new ApiError(503, { detail: "Synthetic previous-review failure." });
+    if (action === "status") {
+      const save = mockedApi.changeStatus.getMockImplementation()!;
+      mockedApi.changeStatus.mockImplementationOnce((...args) => new Promise((resolve, reject) => {
+        finishSave = async () => { if (outcome === "failure") reject(failure); else resolve(await save(...args)); };
+      }));
+    } else {
+      const save = mockedApi.addNote.getMockImplementation()!;
+      mockedApi.addNote.mockImplementationOnce((...args) => new Promise((resolve, reject) => {
+        finishSave = async () => { if (outcome === "failure") reject(failure); else resolve(await save(...args)); };
+      }));
+    }
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${original.title}` }));
+    await screen.findByRole("heading", { name: original.title });
+    if (action === "note") fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), {
+      target: { value: "Synthetic submitted note from the first review." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: action === "status" ? "Save status" : "Add note" }));
+    if (action === "status") fireEvent.keyDown(window, { key: "Escape" });
+    else fireEvent.click(screen.getAllByRole("button", { name: "Close finding details" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: `View ${next.title}` }));
+    await screen.findByRole("heading", { name: next.title });
+    const newDraft = "Synthetic draft belonging to the next review.";
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: newDraft } });
+    await act(async () => { await finishSave(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled());
+    expect(screen.getByRole("heading", { name: next.title })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(newDraft);
+    expect(screen.queryByText(failure.message)).not.toBeInTheDocument();
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(2);
+    if (outcome === "success") await waitFor(() => expect(mockedApi.listFindings).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps review drafts while refreshing after a provider-version conflict", async () => {
+    const finding = serverFindings[1];
+    const initialStatusEvents = serverHistory[finding.id].filter((event) => event.event_type === "finding.status_changed").length;
+    finding.source = "aws-access-analyzer";
+    finding.provider = {
+      status: "ACTIVE", is_public: true,
+      created_at: "2026-10-30T08:00:00Z", updated_at: "2026-10-30T09:00:00Z",
+      analyzed_at: "2026-10-30T09:05:00Z",
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByRole("heading", { name: finding.title });
+    const reason = "Synthetic resolution draft retained across a provider update.";
+    const note = "Synthetic note draft retained across the same update.";
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: reason } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: note } });
+    const refreshed: Finding = {
+      ...finding, version: finding.version + 1, severity: "medium",
+      provider: { ...finding.provider, status: "ARCHIVED", is_public: false, updated_at: "2026-10-31T09:00:00Z" },
+    };
+    serverFindings[1] = refreshed;
+    let finishReload: (value: Finding) => void = () => {};
+    mockedApi.getFinding.mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText(/Your draft has been kept/);
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Save status" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    expect(mockedApi.changeStatus).toHaveBeenCalledTimes(1);
+    await act(async () => { finishReload(refreshed); });
+    await screen.findByText("Archived");
+    expect(screen.getByRole("combobox", { name: "Move finding to status" })).toHaveValue("resolved");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save status" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Resolved");
+    expect(mockedApi.changeStatus).toHaveBeenNthCalledWith(1, finding.id, "resolved", finding.version, reason);
+    expect(mockedApi.changeStatus).toHaveBeenNthCalledWith(2, finding.id, "resolved", refreshed.version, reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    expect(serverHistory[finding.id].filter((event) => event.event_type === "finding.status_changed")).toHaveLength(initialStatusEvents + 1);
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+  });
+
+  it.each(["status", "note"] as const)("keeps the queue usable after a failed %s save", async (action) => {
+    const failure = new ApiError(503, { detail: "Synthetic save failed." });
+    if (action === "status") mockedApi.changeStatus.mockRejectedValueOnce(failure);
+    else mockedApi.addNote.mockRejectedValueOnce(failure);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "View Repeated failed console sign-ins" }));
+    await screen.findByRole("heading", { name: "Repeated failed console sign-ins" });
+    const dialog = screen.getByRole("dialog", { name: "Investigation" });
+    if (action === "note") fireEvent.change(within(dialog).getByRole("textbox", { name: "Add an investigation note" }), {
+      target: { value: "Synthetic note retained after a failed save." },
+    });
+    const buttonName = action === "status" ? "Save status" : "Add note";
+    fireEvent.click(within(dialog).getByRole("button", { name: buttonName }));
+    await within(dialog).findByText("Synthetic save failed.");
+    expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false");
+    expect(mockedApi.listFindings).toHaveBeenCalledTimes(1);
+    if (action === "note") expect(within(dialog).getByRole("textbox", { name: "Add an investigation note" }))
+      .toHaveValue("Synthetic note retained after a failed save.");
+    fireEvent.click(within(dialog).getByRole("button", { name: buttonName }));
+    await waitFor(() => expect(action === "status" ? mockedApi.changeStatus : mockedApi.addNote).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+  });
+
   it("retains provider context after an analyst status change", async () => {
     const finding = serverFindings[0];
     finding.source = "aws-access-analyzer";
