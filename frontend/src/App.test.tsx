@@ -223,6 +223,30 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it.each(["status", "note"] as const)("keeps the queue usable after a failed %s save", async (action) => {
+    const failure = new ApiError(503, { detail: "Synthetic save failed." });
+    if (action === "status") mockedApi.changeStatus.mockRejectedValueOnce(failure);
+    else mockedApi.addNote.mockRejectedValueOnce(failure);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "View Repeated failed console sign-ins" }));
+    await screen.findByRole("heading", { name: "Repeated failed console sign-ins" });
+    const dialog = screen.getByRole("dialog", { name: "Investigation" });
+    if (action === "note") fireEvent.change(within(dialog).getByRole("textbox", { name: "Add an investigation note" }), {
+      target: { value: "Synthetic note retained after a failed save." },
+    });
+    const buttonName = action === "status" ? "Save status" : "Add note";
+    fireEvent.click(within(dialog).getByRole("button", { name: buttonName }));
+    await within(dialog).findByText("Synthetic save failed.");
+    expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false");
+    expect(mockedApi.listFindings).toHaveBeenCalledTimes(1);
+    if (action === "note") expect(within(dialog).getByRole("textbox", { name: "Add an investigation note" }))
+      .toHaveValue("Synthetic note retained after a failed save.");
+    fireEvent.click(within(dialog).getByRole("button", { name: buttonName }));
+    await waitFor(() => expect(action === "status" ? mockedApi.changeStatus : mockedApi.addNote).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+  });
+
   it("retains provider context after an analyst status change", async () => {
     const finding = serverFindings[0];
     finding.source = "aws-access-analyzer";

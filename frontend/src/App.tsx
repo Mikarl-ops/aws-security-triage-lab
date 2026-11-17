@@ -357,9 +357,10 @@ export function App() {
     if (!findingDetail) return false;
     setMutationBusy(true);
     setMutationError(null);
-    setDashboardLoading(true);
     try {
       const updated = await api.changeStatus(findingDetail.id, status, findingDetail.version, reason);
+      setDashboardLoading(true);
+      setDashboardError(null);
       setFindingDetail(updated);
       setDetailLoading(true);
       setDetailError(null);
@@ -391,9 +392,10 @@ export function App() {
     if (!findingDetail) return false;
     setMutationBusy(true);
     setMutationError(null);
-    setDashboardLoading(true);
     try {
       await api.addNote(findingDetail.id, body);
+      setDashboardLoading(true);
+      setDashboardError(null);
       setDetailLoading(true);
       setDetailError(null);
       setDetailReload((revision) => revision + 1);
