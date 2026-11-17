@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { AnalyticsCharts } from "./components/AnalyticsCharts";
 import { AuthScreen } from "./components/AuthScreen";
@@ -98,6 +98,15 @@ export function App() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [mutationBusy, setMutationBusy] = useState(false);
   const [detailReload, setDetailReload] = useState(0);
+  const reviewSession = useRef(0);
+
+  const closeFinding = useCallback(() => {
+    reviewSession.current += 1;
+    setSelectedId(null);
+    setFindingDetail(null);
+    setMutationError(null);
+    setDetailError(null);
+  }, []);
 
   const queryFilters = useMemo(
     () => ({
@@ -131,6 +140,7 @@ export function App() {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
+          closeFinding();
           setAuthState("anonymous");
         } else {
           setAuthError(friendlyError(error));
@@ -140,7 +150,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [closeFinding]);
 
   useEffect(() => {
     if (authState !== "authenticated" || !user) return;
@@ -157,6 +167,7 @@ export function App() {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
+          closeFinding();
           setAuthState("anonymous");
           setAuthError("Your session has expired. Sign in again to continue.");
         } else {
@@ -169,7 +180,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [authState, queryFilters, refreshToken, user]);
+  }, [authState, closeFinding, queryFilters, refreshToken, user]);
 
   useEffect(() => {
     if (authState !== "authenticated" || !user) return;
@@ -182,6 +193,7 @@ export function App() {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
+          closeFinding();
           setAuthState("anonymous");
           setAuthError("Your session has expired. Sign in again to continue.");
         } else {
@@ -194,7 +206,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [analyticsFilters, authState, refreshToken, user]);
+  }, [analyticsFilters, authState, closeFinding, refreshToken, user]);
 
   useEffect(() => {
     if (authState !== "authenticated" || !user) return;
@@ -207,6 +219,7 @@ export function App() {
         if (!active) return;
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
+          closeFinding();
           setAuthState("anonymous");
           setAuthError("Your session has expired. Sign in again to continue.");
         } else {
@@ -219,7 +232,7 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [analyticsFilters, authState, refreshToken, user]);
+  }, [analyticsFilters, authState, closeFinding, refreshToken, user]);
 
   useEffect(() => {
     if (!selectedId || authState !== "authenticated") return;
@@ -236,7 +249,7 @@ export function App() {
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
           setAuthState("anonymous");
-          setSelectedId(null);
+          closeFinding();
           setAuthError("Your session has expired. Sign in again to continue.");
         } else {
           setDetailError(friendlyError(error));
@@ -248,16 +261,16 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [authState, detailReload, selectedId]);
+  }, [authState, closeFinding, detailReload, selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedId(null);
+      if (event.key === "Escape") closeFinding();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedId]);
+  }, [closeFinding, selectedId]);
 
   function prepareAnalyticsRefresh() {
     setAnalyticsLoading(true);
@@ -277,6 +290,7 @@ export function App() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setUser(null);
+        closeFinding();
         setAuthState("anonymous");
       } else {
         setAuthError(friendlyError(error));
@@ -309,12 +323,13 @@ export function App() {
     try {
       await api.logout();
       setUser(null);
-      setSelectedId(null);
+      closeFinding();
       setAuthError(null);
       setAuthState("anonymous");
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setUser(null);
+        closeFinding();
         setAuthState("anonymous");
         setAuthError("Your session has expired. Sign in again to continue.");
       } else {
@@ -338,6 +353,7 @@ export function App() {
   }
 
   function openFinding(findingId: string) {
+    reviewSession.current += 1;
     setFindingDetail(null);
     setNotes([]);
     setHistory([]);
@@ -347,32 +363,30 @@ export function App() {
     setSelectedId(findingId);
   }
 
-  function closeFinding() {
-    setSelectedId(null);
-    setFindingDetail(null);
-    setMutationError(null);
-  }
-
   async function handleStatusChange(status: FindingStatus, reason: string | null) {
-    if (!findingDetail) return false;
+    if (!findingDetail || mutationBusy || detailLoading || detailError) return false;
+    const review = reviewSession.current;
     setMutationBusy(true);
     setMutationError(null);
     try {
       const updated = await api.changeStatus(findingDetail.id, status, findingDetail.version, reason);
       setDashboardLoading(true);
       setDashboardError(null);
-      setFindingDetail(updated);
-      setDetailLoading(true);
-      setDetailError(null);
       prepareAnalyticsRefresh();
       setRefreshToken((token) => token + 1);
-      setDetailReload((revision) => revision + 1);
+      if (review === reviewSession.current) {
+        setFindingDetail(updated);
+        setDetailLoading(true);
+        setDetailError(null);
+        setDetailReload((revision) => revision + 1);
+      }
       return true;
     } catch (error) {
+      if (review !== reviewSession.current) return false;
       if (error instanceof ApiError && error.status === 401) {
         setUser(null);
         setAuthState("anonymous");
-        setSelectedId(null);
+        closeFinding();
         setAuthError("Your session has expired. Sign in again to continue.");
       } else {
         setMutationError(error instanceof ApiError && error.status === 409
@@ -395,24 +409,28 @@ export function App() {
   }
 
   async function handleAddNote(body: string) {
-    if (!findingDetail) return false;
+    if (!findingDetail || mutationBusy || detailLoading || detailError) return false;
+    const review = reviewSession.current;
     setMutationBusy(true);
     setMutationError(null);
     try {
       await api.addNote(findingDetail.id, body);
       setDashboardLoading(true);
       setDashboardError(null);
-      setDetailLoading(true);
-      setDetailError(null);
-      setDetailReload((revision) => revision + 1);
+      if (review === reviewSession.current) {
+        setDetailLoading(true);
+        setDetailError(null);
+        setDetailReload((revision) => revision + 1);
+      }
       prepareAnalyticsRefresh();
       setRefreshToken((token) => token + 1);
       return true;
     } catch (error) {
+      if (review !== reviewSession.current) return false;
       if (error instanceof ApiError && error.status === 401) {
         setUser(null);
         setAuthState("anonymous");
-        setSelectedId(null);
+        closeFinding();
         setAuthError("Your session has expired. Sign in again to continue.");
       } else {
         setMutationError(friendlyError(error));
@@ -617,11 +635,12 @@ export function App() {
           key={selectedId}
           busy={mutationBusy}
           canUpdate={user.role === "analyst"}
-          error={mutationError ?? detailError}
+          error={detailError ?? mutationError}
           finding={findingDetail}
           history={history}
           loading={detailLoading}
           notes={notes}
+          reloadRequired={detailError !== null}
           onAddNote={handleAddNote}
           onChangeStatus={handleStatusChange}
           onClose={closeFinding}

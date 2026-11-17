@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { demoFindings } from "../demoData";
 import type { Finding } from "../types";
@@ -13,6 +13,23 @@ function props() {
 }
 
 describe("finding review drafts", () => {
+  it.each(["status", "note"] as const)("keeps text typed while a %s save is pending", async (action) => {
+    const callbacks = props();
+    let finishSave: (success: boolean) => void = () => {};
+    const pending = () => new Promise<boolean>((resolve) => { finishSave = resolve; });
+    if (action === "status") callbacks.onChangeStatus.mockImplementationOnce(pending);
+    else callbacks.onAddNote.mockImplementationOnce(pending);
+    render(<FindingDetails {...callbacks} finding={{ ...demoFindings[0], status: "investigating" }} />);
+    const field = screen.getByRole("textbox", { name: action === "status" ? "Resolution reason" : "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic submitted text." } });
+    fireEvent.click(screen.getByRole("button", { name: action === "status" ? "Save status" : "Add note" }));
+    fireEvent.change(field, { target: { value: "Synthetic newer text typed during the save." } });
+    await act(async () => { finishSave(true); });
+    expect(field).toHaveValue("Synthetic newer text typed during the save.");
+    if (action === "status") expect(callbacks.onChangeStatus).toHaveBeenCalledWith("resolved", "Synthetic submitted text.");
+    else expect(callbacks.onAddNote).toHaveBeenCalledWith("Synthetic submitted text.");
+  });
+
   it("selects a valid transition when initially unloaded details arrive", () => {
     const callbacks = props();
     const { rerender } = render(<FindingDetails {...callbacks} finding={null} loading={true} />);

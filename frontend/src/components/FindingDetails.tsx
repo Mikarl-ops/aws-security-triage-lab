@@ -12,6 +12,7 @@ interface FindingDetailsProps {
   busy: boolean;
   error: string | null;
   canUpdate: boolean;
+  reloadRequired?: boolean;
   onClose: () => void;
   onRetry: () => void;
   onChangeStatus: (status: FindingStatus, reason: string | null) => Promise<boolean>;
@@ -26,6 +27,7 @@ export function FindingDetails({
   busy,
   error,
   canUpdate,
+  reloadRequired = false,
   onClose,
   onRetry,
   onChangeStatus,
@@ -40,18 +42,21 @@ export function FindingDetails({
 
   async function submitStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!nextStatus) return;
+    if (busy || loading || reloadRequired || !nextStatus) return;
+    const submittedReason = resolutionReason;
     const success = await onChangeStatus(
       nextStatus,
       needsResolutionReason ? resolutionReason.trim() : null,
     );
-    if (success) setResolutionReason("");
+    if (success) setResolutionReason((current) => current === submittedReason ? "" : current);
   }
 
   async function submitNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || loading || reloadRequired || !noteBody.trim()) return;
+    const submittedBody = noteBody;
     const success = await onAddNote(noteBody.trim());
-    if (success) setNoteBody("");
+    if (success) setNoteBody((current) => current === submittedBody ? "" : current);
   }
 
   return (
@@ -174,7 +179,7 @@ export function FindingDetails({
                         />
                       </label>
                     )}
-                    <button className="secondary-button" disabled={busy || loading || !nextStatus} type="submit">
+                    <button className="secondary-button" disabled={busy || loading || reloadRequired || !nextStatus} type="submit">
                       {busy ? "Saving…" : "Save status"}
                     </button>
                   </form>
@@ -218,7 +223,7 @@ export function FindingDetails({
                     </label>
                     <div className="note-form-footer">
                       <span>{noteBody.length}/4,000</span>
-                      <button className="secondary-button" disabled={busy || loading || !noteBody.trim()} type="submit">
+                      <button className="secondary-button" disabled={busy || loading || reloadRequired || !noteBody.trim()} type="submit">
                         {busy ? "Saving…" : "Add note"}
                       </button>
                     </div>
