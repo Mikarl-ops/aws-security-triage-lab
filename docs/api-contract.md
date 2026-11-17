@@ -86,6 +86,28 @@ Provider events are committed with the finding update. Repeated, stale, and fail
 
 Status changes require the analyst role and an `expected_version`, and are written with an audit event. Notes also require the analyst role and create an audit event. Viewers can read findings but cannot change them. API error responses use a consistent problem shape and avoid returning internal exception details.
 
+### `PATCH /findings/{finding_id}`
+
+Send the version from the last successful detail response as a positive integer:
+
+```json
+{
+  "status": "dismissed",
+  "expected_version": 2,
+  "resolution_reason": "Synthetic finding reviewed for the local demonstration."
+}
+```
+
+Valid transitions are `new` to `investigating` or `dismissed`, `investigating` to `resolved` or `dismissed`, and either `resolved` or `dismissed` back to `investigating`. Resolving or dismissing requires a nonblank reason of at most 1,000 characters. Other transitions require an omitted or null reason. Invalid input or transitions return 422.
+
+A provider refresh or another analyst's status save can increment the finding version. If `expected_version` no longer matches, the API returns 409 and changes no finding fields or histories. Fetch the details again, review the current status and provider context, then submit an explicit retry with the new version. A successful update returns the full detail response, increments the version, and records one analyst status event in the same transaction. It does not change provider fields or provider history.
+
+The dashboard refreshes the queue and details on 409 while keeping unsaved text in the open drawer. Saves are disabled until the details load successfully. It does not automatically resubmit the rejected action. The selected transition must remain valid for the refreshed analyst status.
+
+### `POST /findings/{finding_id}/notes`
+
+Send a nonblank `body` of at most 4,000 characters. Notes are appended without an `expected_version`; they do not overwrite finding fields or increment the finding version. A successful response is 201 and creates one note plus its analyst audit event. The dashboard does not automatically retry a failed note request. If a response is lost after submission, reload details and check for the note before retrying.
+
 ## Synthetic-data boundary
 
 The Compose setup loads fabricated data only. No endpoint currently reads from AWS or writes to an AWS account.

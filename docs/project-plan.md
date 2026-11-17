@@ -63,7 +63,19 @@ The map plots approximate positions for supported Region codes. Other codes rema
 - [x] Provide committed baseline and update scenarios for a reproducible local demonstration.
 - [x] Cover history minimization, pagination, access, retry, stale/no-op imports, and rollback in automated checks.
 
-### 5. Controlled live pilot — deferred
+### 5. Synthetic review recovery
+
+- [x] Keep the queue usable after rejected status and note saves.
+- [x] Retain open review drafts when details refresh after a version conflict.
+- [x] Require a successful detail refresh and an explicit reviewed retry before another save.
+- [x] Keep delayed save results and errors associated with the review where they started.
+- [x] Preserve newer text typed while an earlier save is pending.
+- [x] Verify provider and colleague updates reject stale analyst versions without changing either history.
+- [x] Document a reproducible synthetic conflict demonstration and the lifetime of unsaved drafts.
+
+Drafts remain in memory for the open finding only. They are not browser storage or a durable draft feature. See the [review workflow](review-workflow.md) for recovery behavior and limitations.
+
+### 6. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -75,8 +87,10 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] A provider update changes only provider-owned and application-derived data.
 - [x] Analyst status, notes, resolution decisions, and audit history survive re-import.
 - [x] Provider changes retain a paged history that survives alongside analyst activity.
+- [x] A stale analyst save leaves current provider and analyst data intact; an explicit retry uses the refreshed version.
+- [x] Unsaved review text survives in-place refreshes, and earlier requests cannot replace a later review.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
 
-These checked items are covered by the synthetic [importer regression suite](testing.md). They do not represent live AWS verification.
+These checked items are covered by the synthetic [application regression suites](testing.md). They do not represent live AWS verification.
