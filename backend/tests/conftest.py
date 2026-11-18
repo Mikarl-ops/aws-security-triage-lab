@@ -7,12 +7,14 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from flask.testing import FlaskClient
 from flask_migrate import upgrade
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 
 from tracker import create_app
 from tracker.extensions import db
+from tracker.models import User
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -101,3 +103,38 @@ def app(tmp_path):
 @pytest.fixture
 def database_session(app):
     return db.session()
+
+
+class RequestClient(FlaskClient):
+    def open(self, *args, **kwargs):
+        # The migration fixture keeps an app context open; requests need fresh auth/CSRF caches.
+        with self.application.app_context():
+            return super().open(*args, **kwargs)
+
+
+@pytest.fixture
+def authenticated_client(app, database_session):
+    app.test_client_class = RequestClient
+
+    def sign_in(role="analyst", username="synthetic-reviewer"):
+        password = "synthetic-test-password-only"
+        database_session.add(
+            User(
+                username=username,
+                role=role,
+                password_hash=app.extensions["password_hasher"].hash(password),
+            )
+        )
+        database_session.commit()
+        client = app.test_client()
+        token = client.get("/api/v1/auth/csrf").json["csrf_token"]
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": password},
+            headers={"X-CSRFToken": token},
+        )
+        assert response.status_code == 200
+        token = client.get("/api/v1/auth/csrf").json["csrf_token"]
+        return client, {"X-CSRFToken": token}
+
+    return sign_in

@@ -1,7 +1,6 @@
 """Exercise stale analyst drafts against intervening synthetic provider and analyst writes."""
 
 import pytest
-from flask.testing import FlaskClient
 from sqlalchemy import select
 
 from conftest import PROVIDER_UPDATE_FILE, SEED_FILE
@@ -10,42 +9,12 @@ from tracker.importers.access_analyzer import (
     normalize_access_analyzer_finding,
 )
 from tracker.importers.access_analyzer_store import import_access_analyzer_fixture
-from tracker.models import Finding, User
-
-
-class RequestClient(FlaskClient):
-    def open(self, *args, **kwargs):
-        # Give each request fresh auth/CSRF caches despite the migration fixture's context.
-        with self.application.app_context():
-            return super().open(*args, **kwargs)
-
-
-def analyst_client(app, session, username):
-    password = "synthetic-review-password-only"
-    session.add(
-        User(
-            username=username,
-            role="analyst",
-            password_hash=app.extensions["password_hasher"].hash(password),
-        )
-    )
-    session.commit()
-    app.test_client_class = RequestClient
-    client = app.test_client()
-    token = client.get("/api/v1/auth/csrf").json["csrf_token"]
-    response = client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password},
-        headers={"X-CSRFToken": token},
-    )
-    assert response.status_code == 200
-    token = client.get("/api/v1/auth/csrf").json["csrf_token"]
-    return client, {"X-CSRFToken": token}
+from tracker.models import Finding
 
 
 @pytest.mark.parametrize("intervening_writer", ["provider", "analyst"])
 def test_stale_review_requires_refetch_without_changing_either_history(
-    app, database_session, synthetic_payload, analyzer_arn, intervening_writer
+    app, database_session, synthetic_payload, analyzer_arn, intervening_writer, authenticated_client
 ):
     baseline = FixtureAccessAnalyzerPageSource.from_file(SEED_FILE)
     import_access_analyzer_fixture(database_session, baseline, analyzer_arn=analyzer_arn)
@@ -54,7 +23,7 @@ def test_stale_review_requires_refetch_without_changing_either_history(
     ).provider_key
     finding_id = database_session.scalar(select(Finding.id).where(Finding.source_event_id == key))
     path = f"/api/v1/findings/{finding_id}"
-    client, headers = analyst_client(app, database_session, "synthetic-reviewer")
+    client, headers = authenticated_client()
     note = {"body": "Synthetic note recorded before the provider or analyst change."}
     assert client.post(path + "/notes", json=note, headers=headers).status_code == 201
     opened = client.get(path).json
@@ -64,7 +33,7 @@ def test_stale_review_requires_refetch_without_changing_either_history(
         update = FixtureAccessAnalyzerPageSource.from_file(PROVIDER_UPDATE_FILE)
         import_access_analyzer_fixture(database_session, update, analyzer_arn=analyzer_arn)
     else:
-        colleague, colleague_headers = analyst_client(app, database_session, "synthetic-colleague")
+        colleague, colleague_headers = authenticated_client(username="synthetic-colleague")
         assert (
             colleague.patch(
                 path,
