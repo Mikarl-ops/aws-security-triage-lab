@@ -75,7 +75,18 @@ The map plots approximate positions for supported Region codes. Other codes rema
 
 Drafts remain in memory for the open finding only. They are not browser storage or a durable draft feature. See the [review workflow](review-workflow.md) for recovery behavior and limitations.
 
-### 6. Controlled live pilot — deferred
+### 6. Complete analyst record browsing
+
+- [x] Expose notes and analyst activity beyond the first 25 records in the dashboard.
+- [x] Open the newest page using bounded API reads and display total counts separately from page contents.
+- [x] Page notes and activity independently, without replacing unsaved review drafts.
+- [x] Return to the newest records after successful saves and finding refreshes.
+- [x] Handle list failures and expired sessions without presenting unavailable records as an empty history.
+- [x] Verify deterministic ordering, finding isolation, page bounds, roles, retries, and delayed responses with synthetic examples.
+
+The API keeps chronological ordering within each page. The dashboard initially discovers the last page and provides older/newer navigation. Counts reflect the latest response; pages are not a frozen snapshot across requests.
+
+### 7. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -89,6 +100,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Provider changes retain a paged history that survives alongside analyst activity.
 - [x] A stale analyst save leaves current provider and analyst data intact; an explicit retry uses the refreshed version.
 - [x] Unsaved review text survives in-place refreshes, and earlier requests cannot replace a later review.
+- [x] Analysts can reach notes and activity beyond the first page, with full totals and retained drafts.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.

@@ -33,6 +33,14 @@ Start the local Compose services and sign in as an analyst using the [README set
 
 Repeating the same update creates no new version or conflict. To demonstrate a colleague's change on existing synthetic data, open the same finding in two tabs. Save an allowed status transition in the first tab, then try to save the second tab's older view. The second review must refresh and use a currently allowed transition before retrying.
 
+## Browse notes and analyst activity
+
+Each list opens on its newest page and shows the total number of records for that finding. If there are more than 25, **Older notes** and **Newer notes**, or **Older activity events** and **Newer activity events**, move through pages. Records are displayed chronologically within each page. The range and page label show which part of the history is visible.
+
+Paging one list leaves the other list and unsaved form text in place. After a successful note or status save, or a finding refresh, both lists open their newest page so recently recorded work is visible. Drafts in the other form survive that refresh.
+
+A failed list read shows an error and its own retry control. Other successfully loaded sections remain available. If the session expires, **Reload finding details** recovers through the sign-in flow. Counts reflect each response; another analyst may add records between page requests.
+
 ## Draft lifetime and pending saves
 
 Draft text lives only in the open review's memory. Closing the drawer, pressing Escape, opening another finding, signing out, an expired session, or reloading the page discards it. No draft is written to browser storage. A successful save clears the submitted text only if it has not been edited while the request was pending; the other form's draft remains available.
