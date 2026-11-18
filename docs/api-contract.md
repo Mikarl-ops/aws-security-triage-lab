@@ -108,6 +108,16 @@ The dashboard refreshes the queue and details on 409 while keeping unsaved text 
 
 Send a nonblank `body` of at most 4,000 characters. Notes are appended without an `expected_version`; they do not overwrite finding fields or increment the finding version. A successful response is 201 and creates one note plus its analyst audit event. The dashboard does not automatically retry a failed note request. If a response is lost after submission, reload details and check for the note before retrying.
 
+### Read notes and analyst activity
+
+`GET /findings/{finding_id}/notes` and `GET /findings/{finding_id}/history` return independent paginated responses to authenticated viewers and analysts. They accept only positive `page` and `page_size` values, with page size from 1 to 100. Defaults are page 1 and 25 records. Unsupported or invalid queries return 400; missing findings return 404.
+
+Both endpoints order records by their creation/activity timestamp ascending, then UUID ascending for equal timestamps. Responses include `items`, `page`, `page_size`, `total`, and `pages`. Empty histories have one empty page; out-of-range pages return an empty item list while retaining the full total and page count. Reads change no finding versions or records.
+
+The dashboard requests 25 records per page. On opening or refreshing a review, each list reads page 1 to discover the page count, then reads the last page if necessary. This uses at most two bounded requests per list and places recent saves in view. Records remain chronological within that page. Notes and activity have independent older/newer controls and error recovery; loading one list does not reload the other or discard form drafts.
+
+After a successful save or a full detail refresh, both lists restart from their newest page. A failed list read shows an unavailable state and a retry, rather than an empty-history message. An expired session offers a finding reload to recover through the existing sign-in flow. Page totals can change between requests; this is offset pagination, not a consistent snapshot across the whole history.
+
 ## Synthetic-data boundary
 
 The Compose setup loads fabricated data only. No endpoint currently reads from AWS or writes to an AWS account.

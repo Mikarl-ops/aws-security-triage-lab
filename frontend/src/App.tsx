@@ -6,11 +6,9 @@ import { FindingDetails } from "./components/FindingDetails";
 import { FindingsTable, type FindingFiltersView } from "./components/FindingsTable";
 import { RegionsMap } from "./components/RegionsMap";
 import type {
-  AuditEvent,
   Finding,
   FindingAnalytics,
   FindingListItem,
-  FindingNote,
   FindingRegionAnalytics,
   FindingStatus,
   FindingSummary,
@@ -91,8 +89,6 @@ export function App() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [findingDetail, setFindingDetail] = useState<Finding | null>(null);
-  const [notes, setNotes] = useState<FindingNote[]>([]);
-  const [history, setHistory] = useState<AuditEvent[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -237,12 +233,10 @@ export function App() {
   useEffect(() => {
     if (!selectedId || authState !== "authenticated") return;
     let active = true;
-    Promise.all([api.getFinding(selectedId), api.listNotes(selectedId), api.listHistory(selectedId)])
-      .then(([finding, notePage, historyPage]) => {
+    api.getFinding(selectedId)
+      .then((finding) => {
         if (!active) return;
         setFindingDetail(finding);
-        setNotes(notePage.items);
-        setHistory(historyPage.items);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -355,8 +349,6 @@ export function App() {
   function openFinding(findingId: string) {
     reviewSession.current += 1;
     setFindingDetail(null);
-    setNotes([]);
-    setHistory([]);
     setDetailError(null);
     setMutationError(null);
     setDetailLoading(true);
@@ -637,9 +629,8 @@ export function App() {
           canUpdate={user.role === "analyst"}
           error={detailError ?? mutationError}
           finding={findingDetail}
-          history={history}
           loading={detailLoading}
-          notes={notes}
+          recordsRevision={detailReload}
           reloadRequired={detailError !== null}
           onAddNote={handleAddNote}
           onChangeStatus={handleStatusChange}

@@ -167,13 +167,13 @@ beforeEach(() => {
     if (!finding) throw new Error("Finding not found");
     return { ...finding };
   });
-  mockedApi.listNotes.mockImplementation(async (findingId) => {
+  mockedApi.listNotes.mockImplementation(async (findingId, page = 1) => {
     const items = serverNotes[findingId] ?? [];
-    return { items, page: 1, page_size: 25, total: items.length, pages: items.length ? 1 : 0 };
+    return { items: items.slice((page - 1) * 25, page * 25), page, page_size: 25, total: items.length, pages: Math.max(1, Math.ceil(items.length / 25)) };
   });
-  mockedApi.listHistory.mockImplementation(async (findingId) => {
+  mockedApi.listHistory.mockImplementation(async (findingId, page = 1) => {
     const items = serverHistory[findingId] ?? [];
-    return { items, page: 1, page_size: 25, total: items.length, pages: items.length ? 1 : 0 };
+    return { items: items.slice((page - 1) * 25, page * 25), page, page_size: 25, total: items.length, pages: Math.max(1, Math.ceil(items.length / 25)) };
   });
   mockedApi.changeStatus.mockImplementation(
     async (findingId, status: FindingStatus, expectedVersion, resolutionReason) => {
@@ -223,6 +223,62 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("shows new records beyond page one after saves while retaining the other draft", async () => {
+    const finding = serverFindings[1];
+    serverNotes[finding.id] = Array.from({ length: 25 }, (_, index) => ({
+      id: `synthetic-old-note-${index}`, author: analyst.username,
+      body: `Synthetic earlier note ${index + 1}.`, created_at: finding.observed_at,
+    }));
+    serverHistory[finding.id] = Array.from({ length: 25 }, (_, index) => ({
+      id: `synthetic-old-event-${index}`, actor: analyst.username,
+      event_type: "finding.note_added", occurred_at: finding.observed_at,
+      details: { note_id: `synthetic-old-note-${index}` }, request_id: null,
+    }));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByText("Synthetic earlier note 25.");
+    const reason = "Synthetic resolution draft kept while paging and adding a note.";
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: reason } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: "Synthetic newly saved note 26." } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await screen.findByLabelText("26 notes");
+    const notes = screen.getByRole("region", { name: "Investigation notes" });
+    const activity = screen.getByRole("region", { name: "Analyst activity" });
+    expect(within(notes).getByLabelText("26 notes")).toBeInTheDocument();
+    expect(within(notes).getByText("Synthetic newly saved note 26.", { selector: ".note-card p" })).toBeInTheDocument();
+    await within(activity).findByText("Page 2 of 2");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: "Synthetic next note draft." } });
+    fireEvent.click(within(notes).getByRole("button", { name: "Older notes" }));
+    await within(notes).findByText("Synthetic earlier note 1.");
+    expect(within(activity).getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue("Synthetic next note draft.");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await within(activity).findByText("Changed status to resolved");
+    expect(within(activity).getByLabelText("27 activity events")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue("Synthetic next note draft.");
+    expect(mockedApi.addNote).toHaveBeenCalledTimes(1);
+    expect(mockedApi.changeStatus).toHaveBeenCalledTimes(1);
+    expect(mockedApi.listNotes).toHaveBeenCalledWith(finding.id, 2);
+    expect(mockedApi.listHistory).toHaveBeenCalledWith(finding.id, 2);
+  });
+
+  it("keeps editing and activity available when the notes read fails", async () => {
+    mockedApi.listNotes.mockRejectedValueOnce(new Error("Synthetic notes read failure."));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${serverFindings[1].title}` }));
+    await screen.findByRole("button", { name: "Retry investigation notes" });
+    expect(screen.getByRole("button", { name: "Save status" })).toBeEnabled();
+    expect(await screen.findByText("Changed status to investigating")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: "Synthetic draft kept during a notes retry." } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry investigation notes" }));
+    await screen.findByText(/Sample note: verify the policy scope/);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue("Synthetic draft kept during a notes retry.");
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(1);
+  });
+
   it("requires a successful details reload after a conflict refresh fails", async () => {
     const finding = serverFindings[1];
     render(<App />);
@@ -490,8 +546,8 @@ describe("API-connected findings workbench", () => {
     await screen.findByRole("heading", { name: "Storage policy allows public access" });
     const dialog = screen.getByRole("dialog", { name: "Investigation" });
     expect(within(dialog).getByRole("heading", { name: "Storage policy allows public access" })).toBeInTheDocument();
-    expect(within(dialog).getByText(/Sample note: verify the policy scope/)).toBeInTheDocument();
-    expect(within(dialog).getByText("Changed status to investigating")).toBeInTheDocument();
+    expect(await within(dialog).findByText(/Sample note: verify the policy scope/)).toBeInTheDocument();
+    expect(await within(dialog).findByText("Changed status to investigating")).toBeInTheDocument();
   });
 
   it("saves an analyst status change and adds an audited note", async () => {

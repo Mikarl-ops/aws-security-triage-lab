@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react";
-import type { AuditEvent, Finding, FindingNote, FindingStatus } from "../types";
+import type { Finding, FindingStatus } from "../types";
 import { allowedTransitions, formatDate, severityLabels, statusLabels } from "../presentation";
 import { ProviderContext } from "./ProviderContext";
 import { ProviderHistory } from "./ProviderHistory";
+import { AnalystHistory, FindingNotes } from "./AnalystRecords";
 
 interface FindingDetailsProps {
   finding: Finding | null;
-  notes: FindingNote[];
-  history: AuditEvent[];
+  recordsRevision?: number;
   loading: boolean;
   busy: boolean;
   error: string | null;
@@ -21,8 +21,7 @@ interface FindingDetailsProps {
 
 export function FindingDetails({
   finding,
-  notes,
-  history,
+  recordsRevision = 0,
   loading,
   busy,
   error,
@@ -186,26 +185,8 @@ export function FindingDetails({
                 </section>
               )}
 
-              <section className="detail-section">
-                <div className="section-heading-row">
-                  <h3>Investigation notes</h3>
-                  <span className="section-count">{notes.length}</span>
-                </div>
-                {notes.length ? (
-                  <div className="note-list">
-                    {notes.map((note) => (
-                      <article className="note-card" key={note.id}>
-                        <div className="note-meta">
-                          <strong>{note.author}</strong>
-                          <time dateTime={note.created_at}>{formatDate(note.created_at)}</time>
-                        </div>
-                        <p>{note.body}</p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="empty-copy">No notes have been added to this finding.</p>
-                )}
+              <section aria-labelledby="finding-notes-title" className="detail-section">
+                <FindingNotes findingId={finding.id} revision={recordsRevision} onReloadFinding={onRetry} />
                 {canUpdate ? (
                   <form className="note-form" onSubmit={submitNote}>
                     <label className="detail-field">
@@ -233,32 +214,7 @@ export function FindingDetails({
                 )}
               </section>
 
-              <section className="detail-section">
-                <div className="section-heading-row">
-                  <h3>Analyst activity</h3>
-                  <span className="section-count">{history.length}</span>
-                </div>
-                {history.length ? (
-                  <ol className="timeline">
-                    {history.map((event) => (
-                      <li key={event.id}>
-                        <span className="timeline-marker" />
-                        <div>
-                          <strong>{event.actor}</strong>
-                          <p>
-                            {event.event_type === "finding.status_changed"
-                              ? `Changed status to ${String(event.details.to_status ?? "updated")}`
-                              : "Added an investigation note"}
-                          </p>
-                          <time dateTime={event.occurred_at}>{formatDate(event.occurred_at)}</time>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="empty-copy">No activity has been recorded yet.</p>
-                )}
-              </section>
+              <AnalystHistory findingId={finding.id} revision={recordsRevision} onReloadFinding={onRetry} />
             </>
           )}
         </div>

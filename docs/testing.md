@@ -31,6 +31,7 @@ The test harness never uses the application's `DATABASE_URL`. It supplies its ow
 | Fixture command | Explicit confirmation, development/local target guards, successful repeat imports on PostgreSQL |
 | Provider history | Initial and refreshed before/after values; no history for unchanged/stale records; rollback with findings; unique finding versions; authenticated paging and value minimization |
 | Analyst conflicts | An intervening provider or colleague update rejects an old version with 409; refetch and explicit retry record one status event; rejected writes preserve both histories and existing notes |
+| Analyst record pages | More than 25 notes and events remain reachable exactly once across pages; timestamp ties use deterministic UUID ordering; totals, empty out-of-range pages, finding isolation, authentication, roles, and invalid queries |
 
 SQLite drops timezone markers when loading timestamps. The importer compares timestamp values as UTC instants so a database round trip does not turn an unchanged fixture into an update. PostgreSQL exercises the same invariant using its native timestamp handling.
 
@@ -51,6 +52,8 @@ npm run build
 The dashboard tests cover independent provider and analyst status, the public-access flag, UTC provider timestamps, the absence of provider data, and provider context after an analyst update. Provider history cases cover before/after values, older/newer pages, empty results, retries, expired sessions, and safe text rendering. Other tests cover priority filters sent through the existing API contract, authentication and viewer controls, and analytics loading/error recovery. API responses are mocked, so these tests need no running backend. Server permission checks remain covered by the backend suite.
 
 Review recovery cases cover rejected status/note saves without a stuck queue, provider-version conflicts with retained resolution and note drafts, disabled saves during or after a failed detail refresh, valid transitions after a status refresh, text entered while a save is pending, and late success/failure responses after closing or reopening a review. Successful old requests still refresh the queue without reloading another finding's drawer. The [manual walkthrough](review-workflow.md) uses the same committed synthetic scenarios.
+
+Analyst record cases verify newest-page discovery with bounded reads, full totals, older/newer navigation, independent lists, empty results, initial/newest/older-page read recovery, session recovery, and ignoring delayed responses after switching findings. An integrated mocked-API scenario starts with 25 notes and events, saves a 26th note and a status change, and checks the new records appear on page 2 while the other form's draft survives. Another case verifies that a failed notes read does not block finding details, activity, or editing.
 
 The backend conflict cases use real authenticated requests and CSRF validation, with a fresh application context per request so authentication and CSRF caches do not leak between the migration fixture's requests. They test an ordered interleaving of reads and writes on SQLite and PostgreSQL; they do not simulate simultaneous database transactions or browser interaction with a running API.
 
