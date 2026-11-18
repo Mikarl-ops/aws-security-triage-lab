@@ -139,12 +139,14 @@ export const api = {
     return request<Finding>(`/findings/${encodeURIComponent(findingId)}`);
   },
 
-  listNotes(findingId: string) {
-    return request<PageResponse<FindingNote>>(`/findings/${encodeURIComponent(findingId)}/notes`);
+  listNotes(findingId: string, page = 1) {
+    const params = new URLSearchParams({ page: String(page), page_size: "25" });
+    return request<PageResponse<FindingNote>>(`/findings/${encodeURIComponent(findingId)}/notes?${params.toString()}`);
   },
 
-  listHistory(findingId: string) {
-    return request<PageResponse<AuditEvent>>(`/findings/${encodeURIComponent(findingId)}/history`);
+  listHistory(findingId: string, page = 1) {
+    const params = new URLSearchParams({ page: String(page), page_size: "25" });
+    return request<PageResponse<AuditEvent>>(`/findings/${encodeURIComponent(findingId)}/history?${params.toString()}`);
   },
 
   listProviderHistory(findingId: string, page = 1) {

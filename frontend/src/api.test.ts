@@ -18,6 +18,22 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it.each(["listNotes", "listHistory"] as const)("reads bounded %s pages with same-origin credentials", async (method) => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], page: 2, page_size: 25, total: 0, pages: 1 }));
+    await api[method]("synthetic/finding", 2);
+    const endpoint = method === "listNotes" ? "notes" : "history";
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/v1/findings/synthetic%2Ffinding/${endpoint}?page=2&page_size=25`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    await api[method]("synthetic/finding");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/v1/findings/synthetic%2Ffinding/${endpoint}?page=1&page_size=25`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it("reads provider-history pages with same-origin credentials", async () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [], page: 2, page_size: 25, total: 0, pages: 1 }));

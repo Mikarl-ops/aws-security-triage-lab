@@ -4,9 +4,11 @@ import { demoFindings } from "../demoData";
 import type { Finding } from "../types";
 import { FindingDetails } from "./FindingDetails";
 
+vi.mock("./AnalystRecords", () => ({ AnalystHistory: () => null, FindingNotes: () => null }));
+
 function props() {
   return {
-    notes: [], history: [], loading: false, busy: false, error: null, canUpdate: true,
+    loading: false, busy: false, error: null, canUpdate: true,
     onClose: vi.fn(), onRetry: vi.fn(),
     onChangeStatus: vi.fn().mockResolvedValue(true), onAddNote: vi.fn().mockResolvedValue(true),
   };

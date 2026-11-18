@@ -6,6 +6,7 @@ import type { Finding, FindingProvider } from "../types";
 import { FindingDetails } from "./FindingDetails";
 
 vi.mock("./ProviderHistory", () => ({ ProviderHistory: () => null }));
+vi.mock("./AnalystRecords", () => ({ AnalystHistory: () => null, FindingNotes: () => null }));
 
 const syntheticProvider: FindingProvider = {
   status: "ARCHIVED",
@@ -28,8 +29,6 @@ function showDetails(overrides: Partial<Finding> = {}) {
   };
   render(<FindingDetails
     finding={finding}
-    notes={[]}
-    history={[]}
     loading={false}
     busy={false}
     error={null}
