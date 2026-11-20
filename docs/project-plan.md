@@ -86,7 +86,18 @@ Drafts remain in memory for the open finding only. They are not browser storage 
 
 The API keeps chronological ordering within each page. The dashboard initially discovers the last page and provides older/newer navigation. Counts reflect the latest response; pages are not a frozen snapshot across requests.
 
-### 7. Controlled live pilot — deferred
+### 7. Retry-safe synthetic notes
+
+- [x] Add optional note submission keys scoped to author and finding, with database uniqueness.
+- [x] Replay unchanged submissions with the original note and no duplicate analyst event.
+- [x] Reject a scoped key reused with different text and preserve existing unkeyed callers.
+- [x] Keep a failed note's key while the same draft remains open, including across detail reloads.
+- [x] Start a new submission after success, changed text, or a new review.
+- [x] Cover migration preservation, rollback, permissions, lost responses, and simultaneous PostgreSQL requests with synthetic checks.
+
+Retry state in the dashboard is temporary. Closing the review or refreshing the page discards it; a copied draft in another review is a new submission. Database keys remain attached to retained notes unless the retry migration is downgraded.
+
+### 8. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -101,6 +112,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] A stale analyst save leaves current provider and analyst data intact; an explicit retry uses the refreshed version.
 - [x] Unsaved review text survives in-place refreshes, and earlier requests cannot replace a later review.
 - [x] Analysts can reach notes and activity beyond the first page, with full totals and retained drafts.
+- [x] Retrying the same keyed note creates no duplicate note or analyst activity event.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.

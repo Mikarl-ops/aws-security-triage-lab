@@ -106,7 +106,22 @@ The dashboard refreshes the queue and details on 409 while keeping unsaved text 
 
 ### `POST /findings/{finding_id}/notes`
 
-Send a nonblank `body` of at most 4,000 characters. Notes are appended without an `expected_version`; they do not overwrite finding fields or increment the finding version. A successful response is 201 and creates one note plus its analyst audit event. The dashboard does not automatically retry a failed note request. If a response is lost after submission, reload details and check for the note before retrying.
+Send a nonblank `body` of at most 4,000 characters, optionally with a `client_request_id` UUID:
+
+```json
+{
+  "body": "Synthetic investigation note for retry testing.",
+  "client_request_id": "e2772124-423e-4416-aa08-aa063f710001"
+}
+```
+
+The optional key must be a hyphenated UUID string; malformed or null values return 422. The first accepted request creates one note and one analyst audit event in the same transaction. Reusing that key for the same author, finding, and trimmed text returns the original note ID, text, author, and timestamp without another write. Initial and replay responses both use 201 and the existing note response shape. The key is not included in note read responses.
+
+Reusing the scoped key with different trimmed text returns 409 without changing the original note or history. Different authors or findings have independent key scopes, and a new key can intentionally create another note with identical text. Every request, including a replay, requires a valid analyst session and CSRF token.
+
+A database uniqueness constraint handles concurrent uses of a scoped key. A losing transaction rolls back before reading the committed note; failure before commit leaves the key available for a later retry. Keys are retained with their notes. Requests omitting the key keep the existing append behavior and receive no replay protection.
+
+Notes do not require `expected_version`, overwrite finding fields, or increment the finding version. The dashboard generates a key for a submitted draft and retains it after a failed response and across in-place detail reloads. Retrying unchanged trimmed text in the same open review sends the same key. An acknowledged success, edited submitted text, or a new review starts a new submission. Closing, signing out, or refreshing the browser discards the in-memory retry state; it is not persisted in browser storage. The dashboard never automatically resubmits a failed write.
 
 ### Read notes and analyst activity
 
