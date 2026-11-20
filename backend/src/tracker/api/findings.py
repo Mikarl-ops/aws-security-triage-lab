@@ -9,6 +9,7 @@ from uuid import UUID
 from flask import Blueprint, g, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..models import AuditEvent, Finding, FindingNote, ProviderEvent, User
@@ -469,29 +470,76 @@ def add_note(finding_id: str):
     payload, error = json_object()
     if error:
         return error
-    if set(payload) != {"body"}:
+    if "body" not in payload or set(payload) - {"body", "client_request_id"}:
         return _field_error("body")
     body = payload.get("body")
     if not isinstance(body, str) or not body.strip() or len(body) > 4000:
         return _field_error("body")
+    body = body.strip()
+    client_request_id = None
+    if "client_request_id" in payload:
+        value = payload["client_request_id"]
+        try:
+            if not isinstance(value, str) or len(value) != 36:
+                raise ValueError
+            client_request_id = UUID(value)
+            if str(client_request_id) != value.lower():
+                raise ValueError
+        except ValueError:
+            return _field_error("client_request_id")
     parsed_id = _parse_finding_id(finding_id)
     finding = db.session.get(Finding, parsed_id) if parsed_id else None
     if finding is None:
         return problem(404, "Not found", "The requested finding does not exist.")
 
-    note = FindingNote(finding_id=finding.id, author_id=current_user.id, body=body.strip())
-    db.session.add(note)
-    db.session.flush()
-    event = AuditEvent(
-        finding_id=finding.id,
-        actor_id=current_user.id,
-        event_type="finding.note_added",
-        occurred_at=note.created_at,
-        details={"note_id": str(note.id)},
-        request_id=UUID(g.request_id),
+    retry_query = (
+        select(FindingNote).where(
+            FindingNote.finding_id == finding.id,
+            FindingNote.author_id == current_user.id,
+            FindingNote.client_request_id == client_request_id,
+        )
+        if client_request_id is not None
+        else None
     )
-    db.session.add(event)
-    db.session.commit()
+    if retry_query is not None:
+        previous = db.session.scalar(retry_query)
+        if previous is not None:
+            return _note_retry_response(previous, body)
+
+    note = FindingNote(
+        finding_id=finding.id,
+        author_id=current_user.id,
+        body=body,
+        client_request_id=client_request_id,
+    )
+    try:
+        db.session.add(note)
+        db.session.flush()
+        db.session.add(
+            AuditEvent(
+                finding_id=finding.id,
+                actor_id=current_user.id,
+                event_type="finding.note_added",
+                occurred_at=note.created_at,
+                details={"note_id": str(note.id)},
+                request_id=UUID(g.request_id),
+            )
+        )
+        db.session.commit()
+    except IntegrityError:
+        # A concurrent request can commit this scoped key after the lookup above.
+        # Roll back the entire losing transaction before reading its committed note.
+        db.session.rollback()
+        previous = db.session.scalar(retry_query) if retry_query is not None else None
+        if previous is None:
+            raise
+        return _note_retry_response(previous, body)
+    return _note_retry_response(note, body)
+
+
+def _note_retry_response(note: FindingNote, body: str):
+    if note.body != body:
+        return problem(409, "Conflict", "This note request was already used with different text.")
     return (
         jsonify(
             id=str(note.id),
