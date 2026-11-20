@@ -8,7 +8,7 @@ The API rejects a stale status save with 409. The dashboard refreshes the queue,
 
 Status and note saves are disabled while details load. If the refresh fails, the error offers **Reload details** and saves remain disabled until a reload succeeds. When another analyst has changed the status, the **Move to** list shows transitions allowed by the current status. Review that selection as well as the draft text before retrying.
 
-Other rejected saves leave the queue usable and keep the submitted draft available for a manual retry. If a note's response is lost, use **Reload details** to check whether the note was recorded before sending it again; note submissions have no deduplication key.
+Other rejected saves leave the queue usable and keep the submitted draft available for a manual retry. If a note's response is lost, keep the review open. You can use **Reload details** to inspect recorded notes, then retry the unchanged text; the original submission is reused without adding a duplicate note or activity event.
 
 ## Demonstrate a provider update during an open review
 
@@ -40,6 +40,14 @@ Each list opens on its newest page and shows the total number of records for tha
 Paging one list leaves the other list and unsaved form text in place. After a successful note or status save, or a finding refresh, both lists open their newest page so recently recorded work is visible. Drafts in the other form survive that refresh.
 
 A failed list read shows an error and its own retry control. Other successfully loaded sections remain available. If the session expires, **Reload finding details** recovers through the sign-in flow. Counts reflect each response; another analyst may add records between page requests.
+
+## Retry a note after an interrupted save
+
+The dashboard keeps a failed note submission associated with its unchanged trimmed text while that review remains open. If the server recorded the note before its response was lost, retrying **Add note** acknowledges the original note and its single activity event. If the first attempt never committed, the retry records it once. **Reload details** keeps this retry protection as well as the draft.
+
+An acknowledged save clears the submission, so intentionally entering and saving the same text again records a separate note. Editing the submitted text starts a new submission too. The earlier note may already exist after an uncertain response, so inspect the notes before replacing the text with a different submission.
+
+Closing or reopening the drawer, signing out, or refreshing the page discards the temporary retry state. If you copy the text into a new review, inspect existing notes before saving; that is a new submission. No write is automatically retried.
 
 ## Draft lifetime and pending saves
 

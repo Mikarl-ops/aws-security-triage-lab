@@ -32,6 +32,7 @@ The test harness never uses the application's `DATABASE_URL`. It supplies its ow
 | Provider history | Initial and refreshed before/after values; no history for unchanged/stale records; rollback with findings; unique finding versions; authenticated paging and value minimization |
 | Analyst conflicts | An intervening provider or colleague update rejects an old version with 409; refetch and explicit retry record one status event; rejected writes preserve both histories and existing notes |
 | Analyst record pages | More than 25 notes and events remain reachable exactly once across pages; timestamp ties use deterministic UUID ordering; totals, empty out-of-range pages, finding isolation, authentication, roles, and invalid queries |
+| Note retries | Original response on replay; one note and audit event; author/finding scopes; conflicting text and invalid UUIDs; unkeyed compatibility; rollback and a simultaneous PostgreSQL insert race |
 
 SQLite drops timezone markers when loading timestamps. The importer compares timestamp values as UTC instants so a database round trip does not turn an unchanged fixture into an update. PostgreSQL exercises the same invariant using its native timestamp handling.
 
@@ -56,6 +57,10 @@ Review recovery cases cover rejected status/note saves without a stuck queue, pr
 Analyst record cases verify newest-page discovery with bounded reads, full totals, older/newer navigation, independent lists, empty results, initial/newest/older-page read recovery, session recovery, and ignoring delayed responses after switching findings. An integrated mocked-API scenario starts with 25 notes and events, saves a 26th note and a status change, and checks the new records appear on page 2 while the other form's draft survives. Another case verifies that a failed notes read does not block finding details, activity, or editing.
 
 The backend conflict cases use real authenticated requests and CSRF validation, with a fresh application context per request so authentication and CSRF caches do not leak between the migration fixture's requests. They test an ordered interleaving of reads and writes on SQLite and PostgreSQL; they do not simulate simultaneous database transactions or browser interaction with a running API.
+
+The note retry suite separately tests concurrent PostgreSQL transactions. Two authenticated sessions wait at an insert barrier, submit the same scoped key, and must receive the same note with one audit event. SQLite skips that case; both databases check uniqueness, rollback after an audit failure, legacy append behavior, and upgrade/downgrade preservation. A schema downgrade removes retry keys while retaining notes, which the migration tests check explicitly.
+
+Frontend retry cases simulate a note committing before its response is lost, reload details while retaining the draft, and verify an explicit retry sends the original key and leaves one mocked note/event. Other cases require new keys after edited text, reopening, or an acknowledged intentional repeat. The API client checks optional key serialization and fresh CSRF tokens. These mocked tests do not simulate an actual browser network interruption.
 
 The confirmed fixture command's PostgreSQL test imports the committed baseline, repeats it, applies `--scenario provider-update`, and replays the stale baseline. Other command tests reject arbitrary scenario names and database connection query overrides before connecting.
 

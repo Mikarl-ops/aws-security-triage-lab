@@ -223,6 +223,82 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("reuses the note request after a lost response and a detail reload", async () => {
+    const finding = serverFindings[0];
+    serverNotes[finding.id] = [];
+    serverHistory[finding.id] = [];
+    const save = mockedApi.addNote.getMockImplementation()!;
+    let savedNote: FindingNote;
+    mockedApi.addNote.mockImplementationOnce(async (...args) => {
+      savedNote = await save(...args);
+      throw new Error("Synthetic response lost after the server committed.");
+    }).mockImplementationOnce(async () => savedNote);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    const body = "Synthetic note recorded before its response was lost.";
+    fireEvent.change(field, { target: { value: `  ${body}  ` } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reload details" }));
+    await screen.findByText(body, { selector: ".note-card p" });
+    expect(field).toHaveValue(`  ${body}  `);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await waitFor(() => expect(field).toHaveValue(""));
+    const first = mockedApi.addNote.mock.calls[0];
+    expect(first).toEqual([finding.id, body, expect.stringMatching(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/)]);
+    expect(mockedApi.addNote.mock.calls[1]).toEqual(first);
+    expect(serverNotes[finding.id]).toHaveLength(1);
+    expect(serverHistory[finding.id]).toHaveLength(1);
+    expect(serverFindings[0].version).toBe(finding.version);
+  });
+
+  it.each(["edit", "reopen"] as const)("starts a new note request after a failed save when the analyst chooses to %s", async (change) => {
+    const finding = serverFindings[0];
+    mockedApi.addNote.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic note service failure." }));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    let field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    const original = "Synthetic original note intent.";
+    fireEvent.change(field, { target: { value: original } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await screen.findByText("Synthetic note service failure.");
+    if (change === "reopen") {
+      fireEvent.keyDown(window, { key: "Escape" });
+      fireEvent.click(screen.getByRole("button", { name: `View ${finding.title}` }));
+      field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    }
+    const next = change === "edit" ? "Synthetic edited note intent." : original;
+    fireEvent.change(field, { target: { value: next } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await waitFor(() => expect(field).toHaveValue(""));
+    const [first, second] = mockedApi.addNote.mock.calls;
+    expect(first[1]).toBe(original);
+    expect(second[1]).toBe(next);
+    expect(second[2]).toEqual(expect.any(String));
+    expect(second[2]).not.toBe(first[2]);
+  });
+
+  it("uses a new request for an intentional identical note after a successful save", async () => {
+    const finding = serverFindings[0];
+    serverNotes[finding.id] = [];
+    serverHistory[finding.id] = [];
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      fireEvent.change(field, { target: { value: "Synthetic intentionally repeated note." } });
+      await waitFor(() => expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+      await waitFor(() => expect(field).toHaveValue(""));
+    }
+    const [first, second] = mockedApi.addNote.mock.calls;
+    expect(first[1]).toBe(second[1]);
+    expect(first[2]).not.toBe(second[2]);
+    expect(serverNotes[finding.id]).toHaveLength(2);
+    expect(serverHistory[finding.id]).toHaveLength(2);
+  });
+
   it("shows new records beyond page one after saves while retaining the other draft", async () => {
     const finding = serverFindings[1];
     serverNotes[finding.id] = Array.from({ length: 25 }, (_, index) => ({
@@ -579,6 +655,7 @@ describe("API-connected findings workbench", () => {
       expect(mockedApi.addNote).toHaveBeenCalledWith(
         demoFindings[0].id,
         "Reviewed adjacent synthetic identity activity.",
+        expect.any(String),
       ),
     );
     expect(await within(dialog).findByText("Reviewed adjacent synthetic identity activity.")).toBeInTheDocument();

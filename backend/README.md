@@ -56,6 +56,18 @@ Repeat the baseline command after the update to see the older S3 snapshot counte
 
 This repository currently uses synthetic findings only. Live AWS reads, deployment, and cloud resource creation are outside the implemented scope.
 
+## Update an existing database for note retries
+
+Apply the current migration before running the updated API against an existing local development database:
+
+```text
+flask --app tracker:create_app db upgrade
+```
+
+The note retry migration adds nullable `client_request_id` values and a unique constraint scoped to finding and author. Existing notes retain their IDs, text, authors, and timestamps. Keyed retries return the original note without another audit event; older callers that send only `body` continue to append notes independently. See the [API contract](../docs/api-contract.md#post-findingsfinding_idnotes) for replay and conflict responses.
+
+Downgrading this migration preserves note records but removes their retry keys. Upgrading again leaves those old keys unset, so it cannot recover the previous replay protection. Normal forward upgrades retain the keys with their notes.
+
 ## Automated checks
 
 With the dependencies installed, run from this directory:

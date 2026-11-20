@@ -95,9 +95,11 @@ export function App() {
   const [mutationBusy, setMutationBusy] = useState(false);
   const [detailReload, setDetailReload] = useState(0);
   const reviewSession = useRef(0);
+  const pendingNote = useRef<{ body: string; clientRequestId: string } | null>(null);
 
   const closeFinding = useCallback(() => {
     reviewSession.current += 1;
+    pendingNote.current = null;
     setSelectedId(null);
     setFindingDetail(null);
     setMutationError(null);
@@ -348,6 +350,7 @@ export function App() {
 
   function openFinding(findingId: string) {
     reviewSession.current += 1;
+    pendingNote.current = null;
     setFindingDetail(null);
     setDetailError(null);
     setMutationError(null);
@@ -406,7 +409,12 @@ export function App() {
     setMutationBusy(true);
     setMutationError(null);
     try {
-      await api.addNote(findingDetail.id, body);
+      const request = pendingNote.current?.body === body
+        ? pendingNote.current
+        : { body, clientRequestId: crypto.randomUUID() };
+      pendingNote.current = request;
+      await api.addNote(findingDetail.id, body, request.clientRequestId);
+      if (pendingNote.current === request) pendingNote.current = null;
       setDashboardLoading(true);
       setDashboardError(null);
       if (review === reviewSession.current) {

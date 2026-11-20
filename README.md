@@ -11,6 +11,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
 - Open reviews keep unsaved text across refreshes and version conflicts, and require an explicit save after the analyst reviews the refreshed details.
 - Notes and analyst activity open on their newest page, report full record totals, and offer independent controls for older and newer pages.
+- Retrying unchanged note text in an open review reuses its submission and records no duplicate note or activity event.
 - The importer supports a bounded synthetic preview and a confirmed local fixture import; no live AWS connection is available.
 - No live AWS reads, AWS resource creation, or deployment have been performed or authorized.
 - The GitHub repository is public. Treat every pushed file, commit, and screenshot as visible to anyone.

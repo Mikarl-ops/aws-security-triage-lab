@@ -172,6 +172,11 @@ class ProviderEvent(db.Model):
 
 class FindingNote(db.Model):
     __tablename__ = "finding_notes"
+    __table_args__ = (
+        UniqueConstraint(
+            "finding_id", "author_id", "client_request_id", name="uq_finding_notes_client_request"
+        ),
+    )
 
     id = db.Column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     finding_id = db.Column(
@@ -187,6 +192,7 @@ class FindingNote(db.Model):
         index=True,
     )
     body = db.Column(String(4000), nullable=False)
+    client_request_id = db.Column(Uuid(as_uuid=True), nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utc_now, server_default=db.func.now()
     )

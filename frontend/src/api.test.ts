@@ -18,6 +18,22 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it.each([undefined, "e2772124-423e-4416-aa08-aa063f710001"])("sends a note with optional retry key %s and a fresh CSRF token", async (clientRequestId) => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ csrf_token: "synthetic-note-token" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "synthetic-note", body: "Synthetic note." }, 201));
+    await api.addNote("synthetic/finding", "Synthetic note.", clientRequestId);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/auth/csrf");
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toBe("/api/v1/findings/synthetic%2Ffinding/notes");
+    expect(init?.method).toBe("POST");
+    expect(init?.credentials).toBe("same-origin");
+    expect(new Headers(init?.headers).get("X-CSRFToken")).toBe("synthetic-note-token");
+    expect(JSON.parse(String(init?.body))).toEqual(clientRequestId === undefined
+      ? { body: "Synthetic note." }
+      : { body: "Synthetic note.", client_request_id: clientRequestId });
+  });
+
   it.each(["listNotes", "listHistory"] as const)("reads bounded %s pages with same-origin credentials", async (method) => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValue(jsonResponse({ items: [], page: 2, page_size: 25, total: 0, pages: 1 }));
