@@ -169,9 +169,10 @@ export const api = {
     });
   },
 
-  addNote(findingId: string, body: string) {
+  addNote(findingId: string, body: string, clientRequestId?: string) {
     return csrfRequest<FindingNote>(`/findings/${encodeURIComponent(findingId)}/notes`, "POST", {
       body,
+      ...(clientRequestId === undefined ? {} : { client_request_id: clientRequestId }),
     });
   },
 };
