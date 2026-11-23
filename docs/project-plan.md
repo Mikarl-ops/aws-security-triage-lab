@@ -97,7 +97,18 @@ The API keeps chronological ordering within each page. The dashboard initially d
 
 Retry state in the dashboard is temporary. Closing the review or refreshing the page discards it; a copied draft in another review is a new submission. Database keys remain attached to retained notes unless the retry migration is downgraded.
 
-### 8. Controlled live pilot — deferred
+### 8. Provider status filtering
+
+- [x] Filter the queue by Active, Archived, Resolved, or absence of provider data.
+- [x] Apply the same provider filter to resource/time charts and Region analytics across the full matching dataset.
+- [x] Combine provider status with analyst status, priority, source, and supported queue date filters.
+- [x] Reset queue pagination on filter changes and remove provider criteria through both clear controls.
+- [x] Reject unsupported or repeated provider filter values and retain authenticated viewer/analyst reads.
+- [x] Cover imported provider updates, legacy records, date windows, totals beyond page one, and UI request consistency with synthetic checks.
+
+Provider state does not imply an analyst decision. An archived provider finding can still be New in the investigation queue. Overview cards remain global; charts and the map retain their last-30-day UTC window.
+
+### 9. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -113,6 +124,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Unsaved review text survives in-place refreshes, and earlier requests cannot replace a later review.
 - [x] Analysts can reach notes and activity beyond the first page, with full totals and retained drafts.
 - [x] Retrying the same keyed note creates no duplicate note or analyst activity event.
+- [x] Provider status can narrow queue and analytics results independently of analyst status.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.

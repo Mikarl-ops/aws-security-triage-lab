@@ -45,7 +45,7 @@ Note submissions may include a UUID retry key. The database enforces uniqueness 
 
 Analytics endpoints must use the same authorization and filter semantics as the findings queue, then aggregate across all matching records. They must not infer totals from a paginated list response.
 
-- The current analytics endpoint filters by analyst status, severity, and source. Both charts describe the same filtered cohort and 30-day UTC window.
+- Analytics filter by analyst status, severity, source, and provider status. Both charts and the Region map describe the same filtered cohort and 30-day UTC window. Provider status is read independently from analyst status; a null provider status can be selected explicitly.
 - Resource-type counts include an `Unknown` bucket for absent, blank, or unreasonably long values.
 - Time-series buckets use the finding's `observed_at` timestamp normalized to UTC and include zero-count dates.
 - Regional summaries classify location as a Region, global, or unknown.

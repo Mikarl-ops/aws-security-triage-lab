@@ -1,10 +1,11 @@
-import type { FindingListItem, FindingSeverity, FindingStatus } from "../types";
-import { formatDate, severityLabels, statusLabels } from "../presentation";
+import type { FindingListItem, FindingSeverity, FindingStatus, ProviderStatusFilter } from "../types";
+import { formatDate, providerStatusLabels, severityLabels, statusLabels } from "../presentation";
 
 export interface FindingFiltersView {
   status: FindingStatus | "all";
   severity: FindingSeverity | "all";
   source: string;
+  providerStatus: ProviderStatusFilter | "all";
 }
 
 interface FindingsTableProps {
@@ -77,6 +78,20 @@ export function FindingsTable({
           </select>
         </label>
         <label className="filter-select">
+          <span className="sr-only">Provider status</span>
+          <select
+            aria-label="Provider status"
+            onChange={(event) => updateFilter("providerStatus", event.target.value as FindingFiltersView["providerStatus"])}
+            value={filters.providerStatus}
+          >
+            <option value="all">All provider statuses</option>
+            {Object.entries(providerStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>Provider: {label}</option>
+            ))}
+            <option value="none">No provider data</option>
+          </select>
+        </label>
+        <label className="filter-select">
           <span className="sr-only">Triage priority</span>
           <select
             aria-label="Triage priority"
@@ -98,7 +113,7 @@ export function FindingsTable({
         </label>
         <button
           className="clear-filters"
-          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all" })}
+          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all" })}
           type="button"
         >
           Clear filters
@@ -174,7 +189,7 @@ export function FindingsTable({
             <p>Try broadening your search criteria.</p>
             <button
               className="text-button"
-              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all" })}
+              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all" })}
               type="button"
             >
               Clear filters

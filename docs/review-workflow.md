@@ -33,6 +33,16 @@ Start the local Compose services and sign in as an analyst using the [README set
 
 Repeating the same update creates no new version or conflict. To demonstrate a colleague's change on existing synthetic data, open the same finding in two tabs. Save an allowed status transition in the first tab, then try to save the second tab's older view. The second review must refresh and use a currently allowed transition before retrying.
 
+## Filter by provider status
+
+Use **Provider status** beside the analyst filter to choose **Provider: Active**, **Provider: Archived**, **Provider: Resolved**, or **No provider data**. This narrows the queue, resource/time charts, and Region map together. Analyst status, priority, and source remain separate filters and can be combined with that selection.
+
+After importing the synthetic provider-update scenario, select **Provider: Archived** and analyst status **New** to find archived provider records still awaiting analyst review. This can include the S3 finding from the walkthrough as well as other archived synthetic records. Open the S3 finding to inspect its provider history; choosing a filter does not change its analyst status.
+
+**No provider data** finds records without provider-owned fields. **All provider statuses** includes them alongside imported records. **Clear filters**, including the button shown for empty results, removes all criteria. Every filter change returns the queue to page 1.
+
+Overview cards show global totals. Charts and the map show matching findings observed in the last 30 UTC days, while the queue can also contain older records. Their totals can differ for that reason.
+
 ## Browse notes and analyst activity
 
 Each list opens on its newest page and shows the total number of records for that finding. If there are more than 25, **Older notes** and **Newer notes**, or **Older activity events** and **Newer activity events**, move through pages. Records are displayed chronologically within each page. The range and page label show which part of the history is visible.

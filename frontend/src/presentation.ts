@@ -1,4 +1,10 @@
-import type { FindingSeverity, FindingStatus } from "./types";
+import type { FindingSeverity, FindingStatus, ProviderFindingStatus } from "./types";
+
+export const providerStatusLabels: Record<ProviderFindingStatus, string> = {
+  ACTIVE: "Active",
+  ARCHIVED: "Archived",
+  RESOLVED: "Resolved",
+};
 
 export const statusLabels: Record<FindingStatus, string> = {
   new: "New",
