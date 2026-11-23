@@ -19,6 +19,7 @@ from .common import iso_utc, json_object, pagination, parse_page_args, parse_rfc
 bp = Blueprint("findings", __name__, url_prefix="/api/v1")
 STATUSES = ("new", "investigating", "resolved", "dismissed")
 SEVERITIES = ("critical", "high", "medium", "low", "informational")
+PROVIDER_STATUSES = ("ACTIVE", "ARCHIVED", "RESOLVED")
 ALLOWED_METADATA = {"account_id", "resource_id", "resource_type", "event_name"}
 SOURCE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 TRANSITIONS = {
@@ -91,8 +92,45 @@ def _field_error(field: str, code: str = "invalid_value"):
     )
 
 
+def _parse_common_filters():
+    filters = []
+    for field, allowed_values in (("status", STATUSES), ("severity", SEVERITIES)):
+        value = request.args.get(field)
+        if value is not None:
+            if value not in allowed_values:
+                return None, problem(400, "Invalid query", f"{field} is not supported.")
+            filters.append(getattr(Finding, field) == value)
+
+    source = request.args.get("source")
+    if source is not None:
+        if not SOURCE_PATTERN.fullmatch(source):
+            return None, problem(400, "Invalid query", "source is not a valid identifier.")
+        filters.append(Finding.source == source)
+
+    provider_status = request.args.get("provider_status")
+    if len(request.args.getlist("provider_status")) > 1:
+        return None, problem(400, "Invalid query", "provider_status must have one value.")
+    if provider_status is not None:
+        if provider_status == "none":
+            filters.append(Finding.provider_status.is_(None))
+        elif provider_status in PROVIDER_STATUSES:
+            filters.append(Finding.provider_status == provider_status)
+        else:
+            return None, problem(400, "Invalid query", "provider_status is not supported.")
+    return filters, None
+
+
 def _parse_list_filters():
-    allowed = {"status", "severity", "source", "observed_from", "observed_to", "page", "page_size"}
+    allowed = {
+        "status",
+        "severity",
+        "source",
+        "provider_status",
+        "observed_from",
+        "observed_to",
+        "page",
+        "page_size",
+    }
     if set(request.args) - allowed:
         return (
             None,
@@ -100,25 +138,9 @@ def _parse_list_filters():
             None,
             problem(400, "Invalid query", "One or more query parameters are unsupported."),
         )
-
-    filters = []
-    for field, allowed_values in (("status", STATUSES), ("severity", SEVERITIES)):
-        value = request.args.get(field)
-        if value is not None:
-            if value not in allowed_values:
-                return None, None, None, problem(400, "Invalid query", f"{field} is not supported.")
-            filters.append(getattr(Finding, field) == value)
-
-    source = request.args.get("source")
-    if source is not None:
-        if not SOURCE_PATTERN.fullmatch(source):
-            return (
-                None,
-                None,
-                None,
-                problem(400, "Invalid query", "source is not a valid identifier."),
-            )
-        filters.append(Finding.source == source)
+    filters, error = _parse_common_filters()
+    if error:
+        return None, None, None, error
 
     lower = request.args.get("observed_from")
     upper = request.args.get("observed_to")
@@ -172,25 +194,11 @@ def _parse_list_filters():
 
 
 def _parse_analytics_filters():
-    allowed = {"status", "severity", "source"}
+    allowed = {"status", "severity", "source", "provider_status"}
     if set(request.args) - allowed:
         return None, problem(400, "Invalid query", "One or more query parameters are unsupported.")
 
-    filters = []
-    for field, allowed_values in (("status", STATUSES), ("severity", SEVERITIES)):
-        value = request.args.get(field)
-        if value is not None:
-            if value not in allowed_values:
-                return None, problem(400, "Invalid query", f"{field} is not supported.")
-            filters.append(getattr(Finding, field) == value)
-
-    source = request.args.get("source")
-    if source is not None:
-        if not SOURCE_PATTERN.fullmatch(source):
-            return None, problem(400, "Invalid query", "source is not a valid identifier.")
-        filters.append(Finding.source == source)
-
-    return filters, None
+    return _parse_common_filters()
 
 
 def _utc_day_expression():
