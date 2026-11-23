@@ -10,6 +10,7 @@ import type {
   FindingSummary,
   PageResponse,
   ProviderEvent,
+  ProviderStatusFilter,
   SessionUser,
 } from "./types";
 
@@ -19,9 +20,10 @@ export interface FindingFilters {
   status?: FindingStatus;
   severity?: FindingSeverity;
   source?: string;
+  provider_status?: ProviderStatusFilter;
 }
 
-export type AnalyticsFilters = Pick<FindingFilters, "status" | "severity" | "source">;
+export type AnalyticsFilters = Pick<FindingFilters, "status" | "severity" | "source" | "provider_status">;
 
 interface ApiProblem {
   title?: string;
@@ -109,6 +111,7 @@ export const api = {
     if (filters.status) params.set("status", filters.status);
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
+    if (filters.provider_status) params.set("provider_status", filters.provider_status);
     const queryString = params.toString();
     const query = queryString ? `?${queryString}` : "";
     return request<FindingAnalytics>(`/findings/analytics${query}`);
@@ -119,6 +122,7 @@ export const api = {
     if (filters.status) params.set("status", filters.status);
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
+    if (filters.provider_status) params.set("provider_status", filters.provider_status);
     const queryString = params.toString();
     const query = queryString ? `?${queryString}` : "";
     return request<FindingRegionAnalytics>(`/findings/region-analytics${query}`);
@@ -132,6 +136,7 @@ export const api = {
     if (filters.status) params.set("status", filters.status);
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
+    if (filters.provider_status) params.set("provider_status", filters.provider_status);
     return request<PageResponse<FindingListItem>>(`/findings?${params.toString()}`);
   },
 

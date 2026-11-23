@@ -9,6 +9,7 @@ export type ResourceLocation =
   | { scope: "global" | "unknown"; region: null };
 
 export type ProviderFindingStatus = "ACTIVE" | "ARCHIVED" | "RESOLVED";
+export type ProviderStatusFilter = ProviderFindingStatus | "none";
 
 export interface FindingProvider {
   status: ProviderFindingStatus;

@@ -8,6 +8,7 @@ import type {
   Finding,
   FindingAnalytics,
   FindingNote,
+  FindingProvider,
   FindingRegionAnalytics,
   FindingStatus,
   FindingSummary,
@@ -42,6 +43,13 @@ let serverFindings: Finding[];
 let serverNotes: Record<string, FindingNote[]>;
 let serverHistory: Record<string, AuditEvent[]>;
 
+function syntheticProvider(status: FindingProvider["status"]): FindingProvider {
+  return {
+    status, is_public: status === "ACTIVE", created_at: "2026-11-01T08:00:00Z",
+    updated_at: "2026-11-02T08:00:00Z", analyzed_at: "2026-11-02T09:00:00Z",
+  };
+}
+
 function summarize(findings: Finding[]): FindingSummary {
   const summary: FindingSummary = {
     total: findings.length,
@@ -75,7 +83,8 @@ beforeEach(() => {
       (finding) =>
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
-        (!filters.source || finding.source === filters.source),
+        (!filters.source || finding.source === filters.source) &&
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
     );
     const today = new Date();
     const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -115,7 +124,8 @@ beforeEach(() => {
       (finding) =>
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
-        (!filters.source || finding.source === filters.source),
+        (!filters.source || finding.source === filters.source) &&
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
     );
     const today = new Date();
     const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -151,7 +161,8 @@ beforeEach(() => {
       (finding) =>
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
-        (!filters.source || finding.source === filters.source),
+        (!filters.source || finding.source === filters.source) &&
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
     );
     const start = (filters.page - 1) * filters.page_size;
     return {
@@ -223,6 +234,70 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("combines provider status with the other filters across the queue, charts, and map", async () => {
+    const observedAt = new Date().toISOString();
+    serverFindings = serverFindings.map((finding, index) => ({
+      ...finding, observed_at: observedAt,
+      ...(index < 3 ? { provider: syntheticProvider((["ACTIVE", "ARCHIVED", "RESOLVED"] as const)[index]), source: "aws-access-analyzer" } : {}),
+      ...(index === 1 ? { status: "new" as const, severity: "medium" as const } : {}),
+    }));
+    render(<App />);
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "ARCHIVED" } });
+    expect(screen.getByRole("option", { name: "Provider: Archived", selected: true })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: `View ${serverFindings[0].title}` })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: `View ${serverFindings[1].title}` })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), { target: { value: "new" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Triage priority" }), { target: { value: "medium" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "aws-access-analyzer" } });
+    const expected = { status: "new", severity: "medium", source: "aws-access-analyzer", provider_status: "ARCHIVED" };
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ ...expected, page: 1, page_size: 25 }));
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith(expected);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith(expected);
+    const map = screen.getByRole("region", { name: "Findings by AWS Region" });
+    await waitFor(() => expect(within(map).getByText("matching findings").parentElement).toHaveTextContent(/1\s*matching findings/));
+    const timeChart = screen.getByRole("heading", { name: "Findings over time" }).closest("article")!;
+    expect(within(timeChart).getByText("1", { selector: "strong" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    expect(screen.getByRole("combobox", { name: "Provider status" })).toHaveValue("all");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({});
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({});
+  });
+
+  it("distinguishes findings without provider data and clears an empty provider cohort", async () => {
+    serverFindings[0].provider = syntheticProvider("ACTIVE");
+    render(<App />);
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "none" } });
+    await waitFor(() => expect(screen.queryByRole("button", { name: `View ${serverFindings[0].title}` })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: `View ${serverFindings[1].title}` })).toBeInTheDocument();
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, provider_status: "none" });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ provider_status: "none" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ provider_status: "none" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "RESOLVED" } });
+    const empty = await screen.findByText("No findings match these filters");
+    fireEvent.click(within(empty.parentElement!).getByRole("button", { name: "Clear filters" }));
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    expect(screen.getByRole("combobox", { name: "Provider status" })).toHaveValue("all");
+  });
+
+  it("returns to page one when a provider status is selected from a later queue page", async () => {
+    serverFindings = Array.from({ length: 30 }, (_, index) => ({
+      ...demoFindings[0], id: `synthetic-filter-${index}`, title: `Synthetic provider queue ${index}`,
+      provider: syntheticProvider(index === 0 ? "ARCHIVED" : "ACTIVE"), observed_at: new Date().toISOString(),
+    }));
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByRole("button", { name: "View Synthetic provider queue 25" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "ARCHIVED" } });
+    await screen.findByRole("button", { name: "View Synthetic provider queue 0" });
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, provider_status: "ARCHIVED" });
+    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+  });
+
   it("reuses the note request after a lost response and a detail reload", async () => {
     const finding = serverFindings[0];
     serverNotes[finding.id] = [];
@@ -452,7 +527,7 @@ describe("API-connected findings workbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save status" }));
     expect(mockedApi.changeStatus).toHaveBeenCalledTimes(1);
     await act(async () => { finishReload(refreshed); });
-    await screen.findByText("Archived");
+    await within(screen.getByRole("region", { name: "Provider context" })).findByText("Archived");
     expect(screen.getByRole("combobox", { name: "Move finding to status" })).toHaveValue("resolved");
     expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
     expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);

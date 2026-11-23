@@ -83,6 +83,7 @@ export function App() {
     status: "all",
     severity: "all",
     source: "all",
+    providerStatus: "all",
   });
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -113,6 +114,7 @@ export function App() {
       ...(filters.status === "all" ? {} : { status: filters.status }),
       ...(filters.severity === "all" ? {} : { severity: filters.severity }),
       ...(filters.source === "all" ? {} : { source: filters.source }),
+      ...(filters.providerStatus === "all" ? {} : { provider_status: filters.providerStatus }),
     }),
     [filters, page],
   );
@@ -122,6 +124,7 @@ export function App() {
       ...(filters.status === "all" ? {} : { status: filters.status }),
       ...(filters.severity === "all" ? {} : { severity: filters.severity }),
       ...(filters.source === "all" ? {} : { source: filters.source }),
+      ...(filters.providerStatus === "all" ? {} : { provider_status: filters.providerStatus }),
     }),
     [filters],
   );

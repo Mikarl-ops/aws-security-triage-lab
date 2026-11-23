@@ -18,6 +18,26 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it.each(["ARCHIVED", "none"] as const)("sends provider_status=%s to the queue and both analytics endpoints", async (providerStatus) => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    await api.listFindings({ page: 2, page_size: 25, status: "new", provider_status: providerStatus });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/v1/findings?page=2&page_size=25&status=new&provider_status=${providerStatus}`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    await api.getAnalytics({ status: "new", provider_status: providerStatus });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/v1/findings/analytics?status=new&provider_status=${providerStatus}`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    await api.getRegionAnalytics({ status: "new", provider_status: providerStatus });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `/api/v1/findings/region-analytics?status=new&provider_status=${providerStatus}`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it.each([undefined, "e2772124-423e-4416-aa08-aa063f710001"])("sends a note with optional retry key %s and a fresh CSRF token", async (clientRequestId) => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValueOnce(jsonResponse({ csrf_token: "synthetic-note-token" }))
