@@ -33,10 +33,13 @@ The test harness never uses the application's `DATABASE_URL`. It supplies its ow
 | Analyst conflicts | An intervening provider or colleague update rejects an old version with 409; refetch and explicit retry record one status event; rejected writes preserve both histories and existing notes |
 | Analyst record pages | More than 25 notes and events remain reachable exactly once across pages; timestamp ties use deterministic UUID ordering; totals, empty out-of-range pages, finding isolation, authentication, roles, and invalid queries |
 | Note retries | Original response on replay; one note and audit event; author/finding scopes; conflicting text and invalid UUIDs; unkeyed compatibility; rollback and a simultaneous PostgreSQL insert race |
+| Provider filters | Active/Archived/Resolved/null cohorts; independent analyst status; combined source/priority/date criteria; full aggregates beyond page one; legacy data, malformed/repeated values, authentication, and roles |
 
 SQLite drops timezone markers when loading timestamps. The importer compares timestamp values as UTC instants so a database round trip does not turn an unchanged fixture into an update. PostgreSQL exercises the same invariant using its native timestamp handling.
 
 Freshness scenarios replay the baseline fixture after a newer provider update and check that provider fields, analyst status, resolution reason, row version, and application update time remain intact. Other cases verify update-time precedence, analysis-time tie-breaking, and latest-duplicate selection in either page order. The [importer notes](importer.md#provider-freshness-rule) define the local ordering policy.
+
+Provider-filter cases use more than 25 recent matching records plus an older match to verify complete analytics and the difference between queue totals and the 30-day chart/map window. The committed baseline/update scenarios also verify that a provider refresh moves a finding into Archived results while leaving its analyst status New and preserving other archived findings in that result set.
 
 ## Run frontend checks locally
 
@@ -51,6 +54,8 @@ npm run build
 ```
 
 The dashboard tests cover independent provider and analyst status, the public-access flag, UTC provider timestamps, the absence of provider data, and provider context after an analyst update. Provider history cases cover before/after values, older/newer pages, empty results, retries, expired sessions, and safe text rendering. Other tests cover priority filters sent through the existing API contract, authentication and viewer controls, and analytics loading/error recovery. API responses are mocked, so these tests need no running backend. Server permission checks remain covered by the backend suite.
+
+Provider selector cases check the same criteria reach the queue and both analytics APIs, visible counts follow the selected cohort, and provider values remain distinct from analyst status. They also exercise no-provider/empty results, clearing filters from both controls, and selecting a provider state after navigating to queue page 2. API-client cases verify `ARCHIVED` and `none` query serialization with same-origin credentials.
 
 Review recovery cases cover rejected status/note saves without a stuck queue, provider-version conflicts with retained resolution and note drafts, disabled saves during or after a failed detail refresh, valid transitions after a status refresh, text entered while a save is pending, and late success/failure responses after closing or reopening a review. Successful old requests still refresh the queue without reloading another finding's drawer. The [manual walkthrough](review-workflow.md) uses the same committed synthetic scenarios.
 

@@ -8,6 +8,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - The dashboard and this repository's Flask/PostgreSQL API use synthetic findings.
 - The API includes session-based analyst/viewer roles, notes, audit history, and filtered analytics endpoints.
 - Finding details show provider status, public access, and timestamps separately from analyst status. The dashboard labels application-assigned values as triage priority.
+- The queue, charts, and Region map can filter by provider status or absence of provider data, independently of analyst status.
 - Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
 - Open reviews keep unsaved text across refreshes and version conflicts, and require an explicit save after the analyst reviews the refreshed details.
 - Notes and analyst activity open on their newest page, report full record totals, and offer independent controls for older and newer pages.

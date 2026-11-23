@@ -13,10 +13,13 @@ Returns a page of findings. Supported query parameters are:
 | `status` | `new`, `investigating`, `resolved`, `dismissed` |
 | `severity` | `critical`, `high`, `medium`, `low`, `informational` |
 | `source` | Lowercase identifier containing letters, numbers, `_`, or `-` |
+| `provider_status` | `ACTIVE`, `ARCHIVED`, `RESOLVED`, or `none` for findings without provider data |
 | `observed_from`, `observed_to` | RFC 3339 timestamps with a timezone |
 | `page`, `page_size` | Positive page number; page size from 1 to 100 |
 
 Unsupported or invalid query parameters return a client error. Results are ordered by observation time, newest first.
+
+`provider_status` is separate from analyst `status` and combines with the other filters using AND. For example, `/findings?provider_status=ARCHIVED&status=new` finds provider-archived records still awaiting analyst review. `none` matches a null provider status, including legacy synthetic findings; omitting the parameter includes all provider states and records without provider data. An empty, unsupported, or repeated `provider_status` returns 400. Values are case-sensitive.
 
 ### `GET /findings/summary`
 
@@ -24,7 +27,7 @@ Returns total findings and counts by triage status and severity. It does not acc
 
 ### `GET /findings/analytics`
 
-Returns analytics for findings observed in the last 30 UTC calendar days, including today. It accepts the `status`, `severity`, and `source` filters described above. The response's `total`, resource-type counts, and daily counts use the same filtered cohort. Aggregates are computed server-side across every matching finding and are independent of the findings table's pagination.
+Returns analytics for findings observed in the last 30 UTC calendar days, including today. It accepts the `status`, `severity`, `source`, and `provider_status` filters described above. The response's `total`, resource-type counts, and daily counts use the same filtered cohort. Aggregates are computed server-side across every matching finding and are independent of the findings table's pagination.
 
 Abbreviated example response shape (the returned daily bucket list contains 30 entries):
 
@@ -69,6 +72,8 @@ Example provider context for a synthetic imported finding:
 ```
 
 The dashboard shows this context in a read-only section and formats its timestamps in UTC. The Triage priority and Analyst status filters continue to send the existing `severity` and `status` API parameters. Access Analyzer priority is assigned by the documented local rule; provider status does not change analyst status.
+
+The Provider status selector sends the same `provider_status` value to the queue, resource/time charts, and Region analytics. **No provider data** sends `none`; **All provider statuses** omits the filter. Changing any filter resets the queue to page 1, and either **Clear filters** control removes the provider filter as well. Overview cards still use the unfiltered `/findings/summary` endpoint. Queue totals may exceed chart/map totals because the analytics window covers only the last 30 UTC days.
 
 ### `GET /findings/region-analytics`
 
