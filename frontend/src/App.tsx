@@ -351,6 +351,19 @@ export function App() {
     setPage(nextPage);
   }
 
+  function handleRefreshFinding() {
+    if (!selectedId || detailLoading || mutationBusy) return;
+    setMutationError(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    setDetailReload((revision) => revision + 1);
+    setDashboardLoading(true);
+    setDashboardError(null);
+    setPage(1);
+    prepareAnalyticsRefresh();
+    setRefreshToken((token) => token + 1);
+  }
+
   function openFinding(findingId: string) {
     reviewSession.current += 1;
     pendingNote.current = null;
@@ -646,12 +659,7 @@ export function App() {
           onAddNote={handleAddNote}
           onChangeStatus={handleStatusChange}
           onClose={closeFinding}
-          onRetry={() => {
-            setMutationError(null);
-            setDetailLoading(true);
-            setDetailError(null);
-            setDetailReload((revision) => revision + 1);
-          }}
+          onRetry={handleRefreshFinding}
         />
       )}
     </div>

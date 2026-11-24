@@ -138,6 +138,16 @@ The dashboard requests 25 records per page. On opening or refreshing a review, e
 
 After a successful save or a full detail refresh, both lists restart from their newest page. A failed list read shows an unavailable state and a retry, rather than an empty-history message. An expired session offers a finding reload to recover through the existing sign-in flow. Page totals can change between requests; this is offset pagination, not a consistent snapshot across the whole history.
 
+## Refresh an open review
+
+The drawer's **Refresh finding** action uses the existing authenticated GET endpoints for details, notes, analyst history, provider history when present, summary, queue, and analytics. It is available to viewers and analysts. The error panel's **Reload details** uses the same refresh path. Neither action submits a note, changes analyst status, or runs an import.
+
+Current filters remain selected and the queue returns to page 1. The drawer keeps the selected finding even if refreshed queue criteria now exclude it. Note and analyst history panels reopen on their newest page; provider history starts with its newest events. Provider history also reloads when the finding version is unchanged. The record panels follow the explicit reload revision so receiving a newer detail response does not start an extra provider-history read.
+
+The editor retains unsaved text and a failed unchanged note's submission key during refresh. Refresh is disabled during a write or an active detail read. Saves remain disabled until the detail read succeeds; a failed detail read keeps the drafts available for another refresh. An expired session follows the existing sign-in flow and discards the open review's temporary state.
+
+Reads are independent requests and do not form an atomic database snapshot. Each panel retains its existing bounded paging, loading, and error behavior. Queue/chart counts may differ because of the analytics time window. Refresh reads persisted local data; it performs no AWS calls or automatic write retries.
+
 ## Synthetic-data boundary
 
 The Compose setup loads fabricated data only. No endpoint currently reads from AWS or writes to an AWS account.

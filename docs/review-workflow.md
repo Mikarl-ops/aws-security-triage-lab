@@ -2,6 +2,16 @@
 
 Analyst status and provider status have different owners. A provider refresh can change a finding's version while an analyst has its details open. The version check prevents a decision based on an older view from overwriting current data.
 
+## Refresh without closing the investigation
+
+Choose **Refresh finding** in the drawer header after a synthetic import or a colleague's update. It reloads the current local finding, notes, analyst activity, and provider history, and refreshes the overview, queue, charts, and Region map. Filters stay selected; the queue returns to page 1. The drawer remains open even if the updated finding no longer matches the queue filters.
+
+Resolution and note drafts stay in place. Notes/activity return to their newest pages and provider history reloads even if the finding's version did not change. A failed unchanged note keeps its retry protection through this action. **Reload details** in an error message performs the same refresh.
+
+The button shows **Refreshing…** during the detail read, and saves are disabled until that read succeeds. A failed detail refresh keeps the drafts and requires a successful retry before saving. Other panels can finish independently or offer their own retry. An expired session still returns to sign-in and discards the temporary review state.
+
+Refresh does not save a draft or run an import. Review any new provider/analyst state before choosing to save. Refresh is unavailable while a note or status save is pending; closing the drawer remains available.
+
 ## What happens during a conflict
 
 The API rejects a stale status save with 409. The dashboard refreshes the queue, analytics, and finding details, keeps unsaved resolution and note text in the open drawer, and asks the analyst to review the refreshed details before saving again. It does not resubmit the action automatically.
@@ -33,6 +43,8 @@ Start the local Compose services and sign in as an analyst using the [README set
 
 Repeating the same update creates no new version or conflict. To demonstrate a colleague's change on existing synthetic data, open the same finding in two tabs. Save an allowed status transition in the first tab, then try to save the second tab's older view. The second review must refresh and use a currently allowed transition before retrying.
 
+For a baseline that has not yet received the update, an alternative is to follow steps 1–3 and then choose **Refresh finding** before saving. The provider context and history update while both drafts remain. This read adds no analyst activity; a subsequent explicit status save uses the refreshed version.
+
 ## Filter by provider status
 
 Use **Provider status** beside the analyst filter to choose **Provider: Active**, **Provider: Archived**, **Provider: Resolved**, or **No provider data**. This narrows the queue, resource/time charts, and Region map together. Analyst status, priority, and source remain separate filters and can be combined with that selection.
@@ -53,7 +65,7 @@ A failed list read shows an error and its own retry control. Other successfully 
 
 ## Retry a note after an interrupted save
 
-The dashboard keeps a failed note submission associated with its unchanged trimmed text while that review remains open. If the server recorded the note before its response was lost, retrying **Add note** acknowledges the original note and its single activity event. If the first attempt never committed, the retry records it once. **Reload details** keeps this retry protection as well as the draft.
+The dashboard keeps a failed note submission associated with its unchanged trimmed text while that review remains open. If the server recorded the note before its response was lost, retrying **Add note** acknowledges the original note and its single activity event. If the first attempt never committed, the retry records it once. **Reload details** and **Refresh finding** keep this retry protection as well as the draft.
 
 An acknowledged save clears the submission, so intentionally entering and saving the same text again records a separate note. Editing the submitted text starts a new submission too. The earlier note may already exist after an uncertain response, so inspect the notes before replacing the text with a different submission.
 

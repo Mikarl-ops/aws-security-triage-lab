@@ -67,18 +67,23 @@ export function FindingDetails({
             <p className="eyebrow">Finding details</p>
             <h2 id="detail-title">Investigation</h2>
           </div>
-          <button aria-label="Close finding details" className="icon-button" onClick={onClose} type="button">
-            <svg aria-hidden="true" className="icon" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
+          <div className="drawer-actions">
+            <button aria-label="Refresh finding" aria-busy={loading} className="secondary-button" disabled={busy || loading} onClick={onRetry} type="button">
+              {loading ? "Refreshing…" : "Refresh finding"}
+            </button>
+            <button aria-label="Close finding details" className="icon-button" onClick={onClose} type="button">
+              <svg aria-hidden="true" className="icon" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24">
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div aria-busy={loading} className="drawer-content">
           {error && (
             <div className="dashboard-error" role="alert">
               <p>{error}</p>
-              <button className="text-button" onClick={onRetry} type="button">Reload details</button>
+              <button className="text-button" disabled={busy || loading} onClick={onRetry} type="button">Reload details</button>
             </div>
           )}
           {!finding && loading && <p aria-live="polite" className="loading-details">Loading finding…</p>}
@@ -147,7 +152,7 @@ export function FindingDetails({
               </section>
 
               {finding.provider && <ProviderContext provider={finding.provider} />}
-              {finding.provider && <ProviderHistory key={`${finding.id}-${finding.version}`} findingId={finding.id} onReloadFinding={onRetry} />}
+              {finding.provider && <ProviderHistory key={`${finding.id}-${recordsRevision}`} findingId={finding.id} onReloadFinding={onRetry} />}
 
               {canUpdate && choices.length > 0 && (
                 <section className="detail-section action-section">
