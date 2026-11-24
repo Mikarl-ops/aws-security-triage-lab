@@ -234,6 +234,26 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("reloads failed provider history even when the finding version has not changed", async () => {
+    const finding = serverFindings[0];
+    finding.provider = syntheticProvider("ACTIVE");
+    mockedApi.listProviderHistory.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic history read failure." }));
+    mockedApi.addNote.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic note save failure." }));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByRole("button", { name: "Retry provider history" });
+    const field = screen.getByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic draft kept during a full details reload." } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reload details" }));
+    await screen.findByText("No provider changes have been recorded for this finding.");
+    expect(mockedApi.listProviderHistory).toHaveBeenCalledTimes(2);
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(2);
+    expect(field).toHaveValue("Synthetic draft kept during a full details reload.");
+    expect(serverFindings[0].version).toBe(finding.version);
+    expect(mockedApi.addNote).toHaveBeenCalledTimes(1);
+  });
+
   it("combines provider status with the other filters across the queue, charts, and map", async () => {
     const observedAt = new Date().toISOString();
     serverFindings = serverFindings.map((finding, index) => ({

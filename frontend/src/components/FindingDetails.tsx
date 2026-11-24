@@ -147,7 +147,7 @@ export function FindingDetails({
               </section>
 
               {finding.provider && <ProviderContext provider={finding.provider} />}
-              {finding.provider && <ProviderHistory key={`${finding.id}-${finding.version}`} findingId={finding.id} onReloadFinding={onRetry} />}
+              {finding.provider && <ProviderHistory key={`${finding.id}-${finding.version}-${recordsRevision}`} findingId={finding.id} onReloadFinding={onRetry} />}
 
               {canUpdate && choices.length > 0 && (
                 <section className="detail-section action-section">
