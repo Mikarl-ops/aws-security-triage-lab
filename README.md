@@ -11,6 +11,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - The queue, charts, and Region map can filter by provider status or absence of provider data, independently of analyst status.
 - Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
 - Open reviews keep unsaved text across refreshes and version conflicts, and require an explicit save after the analyst reviews the refreshed details.
+- **Refresh finding** reloads an open investigation and its dashboard results while preserving drafts and pending note retry protection.
 - Notes and analyst activity open on their newest page, report full record totals, and offer independent controls for older and newer pages.
 - Retrying unchanged note text in an open review reuses its submission and records no duplicate note or activity event.
 - The importer supports a bounded synthetic preview and a confirmed local fixture import; no live AWS connection is available.
@@ -56,7 +57,7 @@ docker compose exec api flask --app tracker:create_app access-analyzer-import-fi
 docker compose exec api flask --app tracker:create_app access-analyzer-import-fixture --confirm-synthetic --scenario provider-update
 ```
 
-Open `External access: AWS::S3::Bucket` to compare the recorded provider values. Close and reopen its details after running an import. History starts with changes recorded after the history migration; existing findings may have no earlier events. Both commands use fabricated findings only.
+Open `External access: AWS::S3::Bucket` to compare the recorded provider values. If its drawer is already open when you run an import, choose **Refresh finding** to read the new data while retaining draft text. History starts with changes recorded after the history migration; existing findings may have no earlier events. Both commands use fabricated findings only.
 
 Theme colors, fonts, surfaces, and responsive breakpoints are in [styles.css](frontend/src/styles.css). GitHub runs frontend lint, tests, and a production build, alongside the backend database checks. Local commands are in the [testing guide](docs/testing.md).
 

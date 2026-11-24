@@ -108,7 +108,19 @@ Retry state in the dashboard is temporary. Closing the review or refreshing the 
 
 Provider state does not imply an analyst decision. An archived provider finding can still be New in the investigation queue. Overview cards remain global; charts and the map retain their last-30-day UTC window.
 
-### 9. Controlled live pilot — deferred
+### 9. Refresh an open investigation
+
+- [x] Offer an explicit local-data refresh to analysts and viewers without closing the drawer.
+- [x] Refresh details, notes, analyst activity, and provider history, including unchanged finding versions.
+- [x] Refresh overview, queue, charts, and Region results while preserving filters and returning the queue to page 1.
+- [x] Preserve resolution/note drafts and a failed unchanged note's retry key across manual refreshes.
+- [x] Block saves during detail reloads and after failed reloads until recovery succeeds.
+- [x] Ignore late detail responses after switching findings and retain the existing session-expiry boundary.
+- [x] Cover provider updates, independent histories, page-two reviews, viewers, failures, and pending saves with synthetic UI checks.
+
+Refresh reads the current local tracker data and does not import AWS data or submit an analyst action. An open review remains available if its updated finding falls outside the current queue filters. History panels load independently; this is not a single database snapshot across endpoints.
+
+### 10. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -125,6 +137,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Analysts can reach notes and activity beyond the first page, with full totals and retained drafts.
 - [x] Retrying the same keyed note creates no duplicate note or analyst activity event.
 - [x] Provider status can narrow queue and analytics results independently of analyst status.
+- [x] An open investigation can refresh without discarding drafts or an unchanged pending note submission.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
