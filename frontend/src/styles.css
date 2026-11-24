@@ -821,6 +821,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
@@ -829,6 +830,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
 
 .drawer-header .eyebrow { margin: 0 0 3px; }
 .drawer-header h2 { margin: 0; font-size: 1.15rem; }
+.drawer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; }
 
 .drawer-content {
   overflow: auto;

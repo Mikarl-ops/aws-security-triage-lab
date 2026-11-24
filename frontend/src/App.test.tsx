@@ -234,6 +234,206 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("refreshes an open review and its filtered dashboard while retaining drafts", async () => {
+    const now = new Date().toISOString();
+    serverFindings = serverFindings.map((finding) => ({ ...finding, observed_at: now }));
+    const finding = serverFindings[1];
+    finding.source = "aws-access-analyzer";
+    finding.provider = syntheticProvider("ACTIVE");
+    render(<App />);
+    await screen.findByRole("button", { name: `View ${finding.title}` });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "ACTIVE" } });
+    await screen.findByLabelText("1 matching findings");
+    fireEvent.click(screen.getByRole("button", { name: `View ${finding.title}` }));
+    await screen.findByText("No provider changes have been recorded for this finding.");
+    const reason = "Synthetic resolution draft kept while refreshing.";
+    const note = "Synthetic unsaved note kept while refreshing.";
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: reason } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: note } });
+    const refreshed: Finding = { ...finding, version: finding.version + 1, severity: "medium", provider: { ...finding.provider, status: "ARCHIVED", is_public: false } };
+    serverFindings[1] = refreshed;
+    serverNotes[finding.id] = [...(serverNotes[finding.id] ?? []), {
+      id: "synthetic-colleague-note", author: "synthetic-colleague", body: "Synthetic collaborator note after refresh.", created_at: now,
+    }];
+    serverHistory[finding.id] = [...(serverHistory[finding.id] ?? []), {
+      id: "synthetic-colleague-event", actor: "synthetic-colleague", event_type: "finding.note_added",
+      occurred_at: now, details: { note_id: "synthetic-colleague-note" }, request_id: null,
+    }];
+    mockedApi.listProviderHistory.mockResolvedValue({ page: 1, page_size: 25, total: 1, pages: 1, items: [{
+      id: "synthetic-refresh-event", event_type: "provider.updated", finding_version: refreshed.version,
+      occurred_at: now, changes: { provider_status: { before: "ACTIVE", after: "ARCHIVED" } },
+    }] });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await within(screen.getByRole("region", { name: "Provider context" })).findByText("Archived");
+    await screen.findByText("Synthetic collaborator note after refresh.");
+    await screen.findByText("Provider fields refreshed");
+    await screen.findByLabelText("0 matching findings");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    expect(screen.getByText("Analyst status: Investigating")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Provider status" })).toHaveValue("ACTIVE");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, provider_status: "ACTIVE" });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ provider_status: "ACTIVE" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ provider_status: "ACTIVE" });
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(2);
+    expect(mockedApi.listNotes).toHaveBeenCalledTimes(2);
+    expect(mockedApi.listHistory).toHaveBeenCalledTimes(2);
+    expect(mockedApi.listProviderHistory).toHaveBeenCalledTimes(2);
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save status" }));
+    await screen.findByText("Analyst status: Resolved");
+    expect(mockedApi.changeStatus).toHaveBeenCalledWith(finding.id, "resolved", refreshed.version, reason);
+    expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+  });
+
+  it("keeps newer text and blocks saves during a delayed refresh", async () => {
+    const finding = serverFindings[1];
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic note before refresh." } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: "Synthetic resolution before refresh." } });
+    let finishReload: (value: Finding) => void = () => {};
+    mockedApi.getFinding.mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve; }));
+    const refresh = screen.getByRole("button", { name: "Refresh finding" });
+    fireEvent.click(refresh);
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(2));
+    expect(refresh).toBeDisabled();
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save status" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add note" })).toBeDisabled();
+    fireEvent.click(refresh);
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(2);
+    fireEvent.change(field, { target: { value: "Synthetic newer draft typed during refresh." } });
+    await act(async () => { finishReload({ ...finding, version: finding.version + 1 }); });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(field).toHaveValue("Synthetic newer draft typed during refresh.");
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue("Synthetic resolution before refresh.");
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+  });
+
+  it("retains drafts and requires recovery after a manual refresh fails", async () => {
+    const finding = serverFindings[1];
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic retained note after refresh failure." } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Resolution reason" }), { target: { value: "Synthetic retained resolution." } });
+    mockedApi.getFinding.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic manual refresh failure." }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await screen.findByText("Synthetic manual refresh failure.");
+    expect(screen.getByRole("button", { name: "Save status" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add note" })).toBeDisabled();
+    expect(field).toHaveValue("Synthetic retained note after refresh failure.");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save status" })).toBeEnabled());
+    expect(screen.queryByText("Synthetic manual refresh failure.")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue("Synthetic retained resolution.");
+    expect(field).toHaveValue("Synthetic retained note after refresh failure.");
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+  });
+
+  it("lets a viewer refresh without showing write controls", async () => {
+    mockedApi.getSession.mockResolvedValue({ ...analyst, role: "viewer" });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${serverFindings[0].title}` }));
+    await screen.findByText("Viewer access is read-only.");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh finding" })).toBeEnabled());
+    expect(mockedApi.listNotes).toHaveBeenCalledTimes(2);
+    expect(mockedApi.listHistory).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: "Save status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add note" })).not.toBeInTheDocument();
+  });
+
+  it("returns to sign-in when a manual detail refresh reports an expired session", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${serverFindings[0].title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic draft discarded on session expiry." } });
+    mockedApi.getFinding.mockRejectedValueOnce(new ApiError(401, { detail: "Synthetic expired session." }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await screen.findByRole("heading", { name: "Sign in to your workspace" });
+    expect(screen.queryByRole("dialog", { name: "Investigation" })).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Synthetic draft discarded on session expiry.")).not.toBeInTheDocument();
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+  });
+
+  it.each(["success", "expired"] as const)("ignores a previous review's delayed refresh %s", async (outcome) => {
+    const first = serverFindings[0];
+    const next = serverFindings[1];
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${first.title}` }));
+    await screen.findByRole("heading", { name: first.title });
+    let finishReload: () => void = () => {};
+    mockedApi.getFinding.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finishReload = () => outcome === "success"
+        ? resolve({ ...first, title: "Synthetic stale refresh response." })
+        : reject(new ApiError(401, { detail: "Synthetic stale session response." }));
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(2));
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: `View ${next.title}` }));
+    await screen.findByRole("heading", { name: next.title });
+    const field = screen.getByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic next review draft." } });
+    await act(async () => { finishReload(); });
+    expect(screen.getByRole("heading", { name: next.title })).toBeInTheDocument();
+    expect(field).toHaveValue("Synthetic next review draft.");
+    expect(screen.queryByText("Synthetic stale refresh response.")).not.toBeInTheDocument();
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(3);
+  });
+
+  it("waits for an in-flight note save before allowing manual refresh", async () => {
+    const save = mockedApi.addNote.getMockImplementation()!;
+    let finishSave: () => Promise<void> = async () => {};
+    mockedApi.addNote.mockImplementationOnce((...args) => new Promise((resolve) => {
+      finishSave = async () => { resolve(await save(...args)); };
+    }));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: `View ${serverFindings[0].title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic note saved before the manual refresh." } });
+    fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+    const refresh = screen.getByRole("button", { name: "Refresh finding" });
+    expect(refresh).toBeDisabled();
+    fireEvent.click(refresh);
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(1);
+    await act(async () => { await finishSave(); });
+    await screen.findByText("Synthetic note saved before the manual refresh.", { selector: ".note-card p" });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    fireEvent.click(refresh);
+    await waitFor(() => expect(mockedApi.getFinding).toHaveBeenCalledTimes(3));
+    expect(mockedApi.addNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the queue to page one while retaining a review opened from page two", async () => {
+    serverFindings = Array.from({ length: 30 }, (_, index) => ({
+      ...demoFindings[0], id: `synthetic-refresh-${index}`, title: `Synthetic refresh queue ${index}`,
+    }));
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(await screen.findByRole("button", { name: "View Synthetic refresh queue 25" }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic draft from the later page." } });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh finding" }));
+    await screen.findByText("Page 1 of 2");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh finding" })).toBeEnabled());
+    expect(screen.getByRole("heading", { name: "Synthetic refresh queue 25" })).toBeInTheDocument();
+    expect(field).toHaveValue("Synthetic draft from the later page.");
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+  });
+
   it("reloads failed provider history even when the finding version has not changed", async () => {
     const finding = serverFindings[0];
     finding.provider = syntheticProvider("ACTIVE");
@@ -318,7 +518,7 @@ describe("API-connected findings workbench", () => {
     expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
   });
 
-  it("reuses the note request after a lost response and a detail reload", async () => {
+  it.each(["Reload details", "Refresh finding"] as const)("reuses the note request after a lost response through %s", async (control) => {
     const finding = serverFindings[0];
     serverNotes[finding.id] = [];
     serverHistory[finding.id] = [];
@@ -334,7 +534,8 @@ describe("API-connected findings workbench", () => {
     const body = "Synthetic note recorded before its response was lost.";
     fireEvent.change(field, { target: { value: `  ${body}  ` } });
     fireEvent.click(screen.getByRole("button", { name: "Add note" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Reload details" }));
+    await screen.findByRole("button", { name: "Reload details" });
+    fireEvent.click(screen.getByRole("button", { name: control }));
     await screen.findByText(body, { selector: ".note-card p" });
     expect(field).toHaveValue(`  ${body}  `);
     await waitFor(() => expect(screen.getByRole("button", { name: "Add note" })).toBeEnabled());
