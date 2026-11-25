@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from ..extensions import db
 from ..models import AuditEvent, Finding, FindingNote, ProviderEvent, User
 from ..provider_history import public_provider_changes
+from ..resource_location import is_region_code
 from .common import iso_utc, json_object, pagination, parse_page_args, parse_rfc3339, problem
 
 bp = Blueprint("findings", __name__, url_prefix="/api/v1")
@@ -117,6 +118,25 @@ def _parse_common_filters():
             filters.append(Finding.provider_status == provider_status)
         else:
             return None, problem(400, "Invalid query", "provider_status is not supported.")
+
+    scope = request.args.get("location_scope")
+    region = request.args.get("resource_region")
+    for field in ("location_scope", "resource_region"):
+        if len(request.args.getlist(field)) > 1:
+            return None, problem(400, "Invalid query", f"{field} must have one value.")
+    if scope is not None and scope not in {"region", "global", "unknown"}:
+        return None, problem(400, "Invalid query", "location_scope is not supported.")
+    if region is not None:
+        if not is_region_code(region):
+            return None, problem(
+                400, "Invalid query", "resource_region is not a valid Region code."
+            )
+        if scope not in {None, "region"}:
+            return None, problem(400, "Invalid query", "resource_region requires regional scope.")
+        scope = "region"
+        filters.append(Finding.resource_region == region)
+    if scope is not None:
+        filters.append(Finding.resource_location_scope == scope)
     return filters, None
 
 
@@ -126,6 +146,8 @@ def _parse_list_filters():
         "severity",
         "source",
         "provider_status",
+        "location_scope",
+        "resource_region",
         "observed_from",
         "observed_to",
         "page",
@@ -194,7 +216,14 @@ def _parse_list_filters():
 
 
 def _parse_analytics_filters():
-    allowed = {"status", "severity", "source", "provider_status"}
+    allowed = {
+        "status",
+        "severity",
+        "source",
+        "provider_status",
+        "location_scope",
+        "resource_region",
+    }
     if set(request.args) - allowed:
         return None, problem(400, "Invalid query", "One or more query parameters are unsupported.")
 
