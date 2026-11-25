@@ -1,9 +1,10 @@
-import type { FindingRegionAnalytics } from "../types";
+import type { FindingRegionAnalytics, ResourceLocationScope } from "../types";
 
 interface RegionsMapProps {
   analytics: FindingRegionAnalytics | null;
   error: string | null;
   loading: boolean;
+  onSelectLocation: (scope: ResourceLocationScope, region?: string) => void;
 }
 
 const MAP_WIDTH = 960;
@@ -80,7 +81,7 @@ function displayDate(day: string) {
     .format(new Date(`${day}T00:00:00Z`));
 }
 
-export function RegionsMap({ analytics, error, loading }: RegionsMapProps) {
+export function RegionsMap({ analytics, error, loading, onSelectLocation }: RegionsMapProps) {
   const periodLabel = analytics
     ? `${displayDate(analytics.window.start)} – ${displayDate(analytics.window.end)} · UTC`
     : "Last 30 days · UTC";
@@ -151,16 +152,16 @@ export function RegionsMap({ analytics, error, loading }: RegionsMapProps) {
 
           <aside aria-label="Region counts" className="region-summary">
             <div className="region-scope-grid">
-              <div><span>Regional</span><strong>{analytics.by_scope.region}</strong></div>
-              <div><span>Global</span><strong>{analytics.by_scope.global}</strong></div>
-              <div><span>Unknown</span><strong>{analytics.by_scope.unknown}</strong></div>
+              <button type="button" aria-label={`Filter regional resources (${analytics.by_scope.region})`} disabled={analytics.by_scope.region === 0} onClick={() => onSelectLocation("region")}><span>Regional</span><strong>{analytics.by_scope.region}</strong></button>
+              <button type="button" aria-label={`Filter global resources (${analytics.by_scope.global})`} disabled={analytics.by_scope.global === 0} onClick={() => onSelectLocation("global")}><span>Global</span><strong>{analytics.by_scope.global}</strong></button>
+              <button type="button" aria-label={`Filter unknown locations (${analytics.by_scope.unknown})`} disabled={analytics.by_scope.unknown === 0} onClick={() => onSelectLocation("unknown")}><span>Unknown</span><strong>{analytics.by_scope.unknown}</strong></button>
             </div>
             <h3>Regional findings</h3>
             {analytics.by_region.length ? (
               <ul className="region-count-list">
                 {analytics.by_region.map((item) => (
                   <li key={item.region}>
-                    <span>{item.region}</span>
+                    <button aria-label={`Filter findings in ${item.region} (${item.count})`} className="region-filter-link" type="button" onClick={() => onSelectLocation("region", item.region)}>{item.region}</button>
                     <strong>{item.count}</strong>
                     {!REGION_POSITIONS[item.region] ? <small>List only</small> : null}
                   </li>

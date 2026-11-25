@@ -12,6 +12,7 @@ import type {
   FindingRegionAnalytics,
   FindingStatus,
   FindingSummary,
+  ResourceLocationScope,
   SessionUser,
 } from "./types";
 import "./styles.css";
@@ -84,6 +85,8 @@ export function App() {
     severity: "all",
     source: "all",
     providerStatus: "all",
+    locationScope: "all",
+    resourceRegion: "",
   });
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -107,26 +110,21 @@ export function App() {
     setDetailError(null);
   }, []);
 
-  const queryFilters = useMemo(
-    () => ({
-      page,
-      page_size: 25,
-      ...(filters.status === "all" ? {} : { status: filters.status }),
-      ...(filters.severity === "all" ? {} : { severity: filters.severity }),
-      ...(filters.source === "all" ? {} : { source: filters.source }),
-      ...(filters.providerStatus === "all" ? {} : { provider_status: filters.providerStatus }),
-    }),
-    [filters, page],
-  );
-
   const analyticsFilters = useMemo(
     () => ({
       ...(filters.status === "all" ? {} : { status: filters.status }),
       ...(filters.severity === "all" ? {} : { severity: filters.severity }),
       ...(filters.source === "all" ? {} : { source: filters.source }),
       ...(filters.providerStatus === "all" ? {} : { provider_status: filters.providerStatus }),
+      ...(filters.locationScope === "all" ? {} : { location_scope: filters.locationScope }),
+      ...(filters.locationScope === "region" && filters.resourceRegion ? { resource_region: filters.resourceRegion } : {}),
     }),
     [filters],
+  );
+
+  const queryFilters = useMemo(
+    () => ({ ...analyticsFilters, page, page_size: 25 }),
+    [analyticsFilters, page],
   );
 
   useEffect(() => {
@@ -349,6 +347,10 @@ export function App() {
     setDashboardLoading(true);
     setDashboardError(null);
     setPage(nextPage);
+  }
+
+  function handleLocationChange(scope: ResourceLocationScope, region = "") {
+    handleFilterChange({ ...filters, locationScope: scope, resourceRegion: scope === "region" ? region : "" });
   }
 
   function handleRefreshFinding() {
@@ -616,6 +618,7 @@ export function App() {
             analytics={regionAnalytics}
             error={regionAnalyticsError}
             loading={regionAnalyticsLoading}
+            onSelectLocation={handleLocationChange}
           />
 
           <FindingsTable

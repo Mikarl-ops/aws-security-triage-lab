@@ -18,6 +18,19 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it("sends explicit resource placement to the queue and both analytics endpoints", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    const filters = { location_scope: "region" as const, resource_region: "ap-southeast-1", provider_status: "ARCHIVED" as const };
+    await api.listFindings({ ...filters, page: 2, page_size: 25 });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/findings?page=2&page_size=25&provider_status=ARCHIVED&location_scope=region&resource_region=ap-southeast-1");
+    await api.getAnalytics(filters);
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/findings/analytics?provider_status=ARCHIVED&location_scope=region&resource_region=ap-southeast-1");
+    await api.getRegionAnalytics({ location_scope: "unknown" });
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/v1/findings/region-analytics?location_scope=unknown");
+    expect(fetchMock.mock.calls.every(([, init]) => init?.credentials === "same-origin")).toBe(true);
+  });
+
   it.each(["ARCHIVED", "none"] as const)("sends provider_status=%s to the queue and both analytics endpoints", async (providerStatus) => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValue(jsonResponse({}));
