@@ -55,6 +55,16 @@ After importing the synthetic provider-update scenario, select **Provider: Archi
 
 Overview cards show global totals. Charts and the map show matching findings observed in the last 30 UTC days, while the queue can also contain older records. Their totals can differ for that reason.
 
+## Filter by resource location
+
+Choose **Resource location** to select **Regional resources**, **Global resources**, or **Unknown location**. Regional resources expose an **AWS Region code** field. Enter a complete code such as `ap-southeast-1`, then choose **Apply Region**; typing alone leaves the applied filter unchanged. The helper text reports the applied code. Surrounding whitespace and uppercase letters are normalized on submission. Applying a blank code includes every regional resource.
+
+You can also select a Region in the map's count list, including a **List only** code with no plotted marker, or choose a nonzero Regional, Global, or Unknown count. These choices retain analyst status, provider status, priority, and source criteria. Map markers remain informational. Counts describe the current filtered 30-day UTC window; zero-count scope buttons are disabled. Choose **All locations** to broaden the map before selecting another location, or use the selector directly to reach scopes with no recent matches.
+
+To find an older-only Region, use the code field even if the map has no entry for it. The queue may contain matches while the charts and map show no matches in their period. Global and unknown locations remain separate, and legacy event metadata never determines this filter. The code field validates syntax rather than AWS Region availability; a well-formed unused code produces empty results.
+
+Every applied change returns the queue to page 1. Switching scope clears the exact Region. Either **Clear filters** control removes all criteria, and **Refresh finding** preserves the applied location while retaining open-review drafts.
+
 ## Browse notes and analyst activity
 
 Each list opens on its newest page and shows the total number of records for that finding. If there are more than 25, **Older notes** and **Newer notes**, or **Older activity events** and **Newer activity events**, move through pages. Records are displayed chronologically within each page. The range and page label show which part of the history is visible.

@@ -120,7 +120,19 @@ Provider state does not imply an analyst decision. An archived provider finding 
 
 Refresh reads the current local tracker data and does not import AWS data or submit an analyst action. An open review remains available if its updated finding falls outside the current queue filters. History panels load independently; this is not a single database snapshot across endpoints.
 
-### 10. Controlled live pilot — deferred
+### 10. Resource location filtering
+
+- [x] Filter the queue and both analytics endpoints by explicit regional, global, or unknown resource location.
+- [x] Accept an exact Region code without depending on map coordinates or a live AWS Region lookup.
+- [x] Make Region list entries and nonzero scope counts select the matching dashboard filters while retaining other criteria.
+- [x] Apply typed Region codes only on explicit submission, with local syntax validation and a visible applied value.
+- [x] Reset queue pagination on location changes and clear location criteria through both clear controls.
+- [x] Preserve applied location filters across open-review refreshes without losing drafts.
+- [x] Cover complete aggregates, metadata independence, malformed/conflicting queries, older-only Regions, unplotted codes, and request consistency with synthetic checks.
+
+Filters use stored resource location rather than event metadata or source-IP geography. Charts and map counts retain their 30-day UTC window; the queue can include older matches. Map counts describe the currently filtered window, and the location selector can reach scopes absent from those counts.
+
+### 11. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -138,6 +150,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Retrying the same keyed note creates no duplicate note or analyst activity event.
 - [x] Provider status can narrow queue and analytics results independently of analyst status.
 - [x] An open investigation can refresh without discarding drafts or an unchanged pending note submission.
+- [x] Explicit resource locations can narrow the queue and analytics, including Region codes without map coordinates.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
