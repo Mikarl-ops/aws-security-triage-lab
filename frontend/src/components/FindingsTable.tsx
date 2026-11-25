@@ -1,11 +1,14 @@
-import type { FindingListItem, FindingSeverity, FindingStatus, ProviderStatusFilter } from "../types";
+import type { FindingListItem, FindingSeverity, FindingStatus, ProviderStatusFilter, ResourceLocationScope } from "../types";
 import { formatDate, providerStatusLabels, severityLabels, statusLabels } from "../presentation";
+import { LocationFilter } from "./LocationFilter";
 
 export interface FindingFiltersView {
   status: FindingStatus | "all";
   severity: FindingSeverity | "all";
   source: string;
   providerStatus: ProviderStatusFilter | "all";
+  locationScope: ResourceLocationScope | "all";
+  resourceRegion: string;
 }
 
 interface FindingsTableProps {
@@ -111,9 +114,11 @@ export function FindingsTable({
             {sources.map((source) => <option key={source} value={source}>{source}</option>)}
           </select>
         </label>
+        <LocationFilter scope={filters.locationScope} region={filters.resourceRegion}
+          onChange={(scope, region) => onFiltersChange({ ...filters, locationScope: scope, resourceRegion: region })} />
         <button
           className="clear-filters"
-          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all" })}
+          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
           type="button"
         >
           Clear filters
@@ -189,7 +194,7 @@ export function FindingsTable({
             <p>Try broadening your search criteria.</p>
             <button
               className="text-button"
-              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all" })}
+              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
               type="button"
             >
               Clear filters

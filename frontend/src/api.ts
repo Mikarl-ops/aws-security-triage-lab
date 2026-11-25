@@ -11,6 +11,7 @@ import type {
   PageResponse,
   ProviderEvent,
   ProviderStatusFilter,
+  ResourceLocationScope,
   SessionUser,
 } from "./types";
 
@@ -21,9 +22,11 @@ export interface FindingFilters {
   severity?: FindingSeverity;
   source?: string;
   provider_status?: ProviderStatusFilter;
+  location_scope?: ResourceLocationScope;
+  resource_region?: string;
 }
 
-export type AnalyticsFilters = Pick<FindingFilters, "status" | "severity" | "source" | "provider_status">;
+export type AnalyticsFilters = Pick<FindingFilters, "status" | "severity" | "source" | "provider_status" | "location_scope" | "resource_region">;
 
 interface ApiProblem {
   title?: string;
@@ -112,6 +115,8 @@ export const api = {
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
     if (filters.provider_status) params.set("provider_status", filters.provider_status);
+    if (filters.location_scope) params.set("location_scope", filters.location_scope);
+    if (filters.resource_region) params.set("resource_region", filters.resource_region);
     const queryString = params.toString();
     const query = queryString ? `?${queryString}` : "";
     return request<FindingAnalytics>(`/findings/analytics${query}`);
@@ -123,6 +128,8 @@ export const api = {
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
     if (filters.provider_status) params.set("provider_status", filters.provider_status);
+    if (filters.location_scope) params.set("location_scope", filters.location_scope);
+    if (filters.resource_region) params.set("resource_region", filters.resource_region);
     const queryString = params.toString();
     const query = queryString ? `?${queryString}` : "";
     return request<FindingRegionAnalytics>(`/findings/region-analytics${query}`);
@@ -137,6 +144,8 @@ export const api = {
     if (filters.severity) params.set("severity", filters.severity);
     if (filters.source) params.set("source", filters.source);
     if (filters.provider_status) params.set("provider_status", filters.provider_status);
+    if (filters.location_scope) params.set("location_scope", filters.location_scope);
+    if (filters.resource_region) params.set("resource_region", filters.resource_region);
     return request<PageResponse<FindingListItem>>(`/findings?${params.toString()}`);
   },
 

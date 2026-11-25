@@ -14,6 +14,8 @@ Returns a page of findings. Supported query parameters are:
 | `severity` | `critical`, `high`, `medium`, `low`, `informational` |
 | `source` | Lowercase identifier containing letters, numbers, `_`, or `-` |
 | `provider_status` | `ACTIVE`, `ARCHIVED`, `RESOLVED`, or `none` for findings without provider data |
+| `location_scope` | `region`, `global`, or `unknown` |
+| `resource_region` | Lowercase Region code of at most 32 characters, such as `ap-southeast-1` |
 | `observed_from`, `observed_to` | RFC 3339 timestamps with a timezone |
 | `page`, `page_size` | Positive page number; page size from 1 to 100 |
 
@@ -21,13 +23,17 @@ Unsupported or invalid query parameters return a client error. Results are order
 
 `provider_status` is separate from analyst `status` and combines with the other filters using AND. For example, `/findings?provider_status=ARCHIVED&status=new` finds provider-archived records still awaiting analyst review. `none` matches a null provider status, including legacy synthetic findings; omitting the parameter includes all provider states and records without provider data. An empty, unsupported, or repeated `provider_status` returns 400. Values are case-sensitive.
 
+Location filters use only stored `resource_location_scope` and `resource_region`, never `metadata.region` or source-IP geography. `location_scope=region` includes every regional resource; `global` and `unknown` match their explicit scopes separately. An exact `resource_region` implies regional scope when scope is omitted. Combining an exact Region with `global` or `unknown` returns 400. Empty, malformed, or repeated location parameters also return 400.
+
+Region syntax is `^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$` with a maximum length of 32. The API neither normalizes uppercase/whitespace nor checks an AWS Region inventory. A well-formed but unpopulated code returns empty results, including codes without map coordinates. For example, `/findings?resource_region=ap-southeast-1&provider_status=ARCHIVED&status=new` combines all three criteria using AND. Queue date filters remain available alongside location filters.
+
 ### `GET /findings/summary`
 
 Returns total findings and counts by triage status and severity. It does not accept query parameters.
 
 ### `GET /findings/analytics`
 
-Returns analytics for findings observed in the last 30 UTC calendar days, including today. It accepts the `status`, `severity`, `source`, and `provider_status` filters described above. The response's `total`, resource-type counts, and daily counts use the same filtered cohort. Aggregates are computed server-side across every matching finding and are independent of the findings table's pagination.
+Returns analytics for findings observed in the last 30 UTC calendar days, including today. It accepts the `status`, `severity`, `source`, `provider_status`, `location_scope`, and `resource_region` filters described above. The response's `total`, resource-type counts, and daily counts use the same filtered cohort. Aggregates are computed server-side across every matching finding and are independent of the findings table's pagination.
 
 Abbreviated example response shape (the returned daily bucket list contains 30 entries):
 
@@ -75,9 +81,11 @@ The dashboard shows this context in a read-only section and formats its timestam
 
 The Provider status selector sends the same `provider_status` value to the queue, resource/time charts, and Region analytics. **No provider data** sends `none`; **All provider statuses** omits the filter. Changing any filter resets the queue to page 1, and either **Clear filters** control removes the provider filter as well. Overview cards still use the unfiltered `/findings/summary` endpoint. Queue totals may exceed chart/map totals because the analytics window covers only the last 30 UTC days.
 
+The **Resource location** selector and map count buttons share those same requests. **All locations** omits both location parameters. **Regional resources** sends `location_scope=region`; **Apply Region** trims and lowercases a complete typed code before adding `resource_region`. Typing alone does not change requests. A blank applied code includes all regional resources. Changing scope clears the exact Region, and either clear control removes both location criteria. Applied criteria survive **Refresh finding**.
+
 ### `GET /findings/region-analytics`
 
-Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts the same `status`, `severity`, and `source` filters as `/findings/analytics`; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
+Returns counts by explicit AWS resource Region plus counts by location scope for the same last-30-day UTC window. It accepts all six filters supported by `/findings/analytics`, with the same location validation; neither result depends on table pagination. The `by_region` array includes only findings whose scope is `region`. `by_scope` always includes `region`, `global`, and `unknown` counts. Global and unknown findings are not assigned map coordinates.
 
 ### `GET /findings/{finding_id}/provider-history`
 

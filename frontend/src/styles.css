@@ -579,13 +579,16 @@ a {
 
 .region-summary { min-width: 0; padding: 2px 1px; }
 .region-scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-.region-scope-grid div { display: grid; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: rgb(10 18 29 / 45%); }
+.region-scope-grid button { display: grid; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: rgb(10 18 29 / 45%); text-align: start; cursor: pointer; }
+.region-scope-grid button:hover:not(:disabled) { border-color: var(--mint); }
+.region-scope-grid button:disabled { cursor: default; opacity: 0.55; }
 .region-scope-grid span { color: var(--muted); font-size: 0.64rem; }
 .region-scope-grid strong { color: var(--ink); font: 650 0.9rem/1 var(--mono); }
 .region-summary h3 { margin: 17px 0 8px; font-size: 0.75rem; }
 .region-count-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .region-count-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-width: 0; padding: 7px 8px; border-radius: 7px; background: rgb(10 18 29 / 32%); }
-.region-count-list li span { overflow: hidden; color: var(--ink); font: 0.68rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.region-filter-link { overflow: hidden; padding: 0; border: 0; background: none; color: var(--ink); font: 0.68rem var(--mono); text-align: start; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.region-filter-link:hover { color: var(--mint); text-decoration: underline; }
 .region-count-list li strong { color: var(--mint); font: 650 0.72rem/1 var(--mono); }
 .region-count-list li small { color: var(--muted); font-size: 0.6rem; }
 .region-list-empty { color: var(--muted); font-size: 0.7rem; line-height: 1.45; }
@@ -629,7 +632,13 @@ a {
 .filter-symbol { color: var(--mint); }
 .filter-select { min-width: 0; }
 
-.filter-select select, .login-form input, .detail-field select, .detail-field textarea {
+.location-filter, .region-code-form { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.region-code-form { flex: 1 1 220px; }
+.region-code-form input { width: 160px; }
+.region-filter-help { flex-basis: 100%; color: var(--muted); font-size: 0.7rem; }
+.region-filter-help.error-text { color: var(--red); }
+
+.filter-select select, .region-code-form input, .login-form input, .detail-field select, .detail-field textarea {
   max-width: 100%;
   padding: 8px 10px;
   border: 1px solid #3a4b64;
@@ -1068,6 +1077,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
   .panel-heading, .filter-bar, .table-footer { padding: 10px; }
   .filter-caption, .table-context { display: none; }
   .filter-bar { gap: 6px; }
+  .location-filter { flex-basis: 100%; }
   .filter-select { flex: 1 1 82px; }
   .filter-select select { width: 100%; padding: 6px 4px; font-size: 0.72rem; }
   .clear-filters { min-height: 30px; }

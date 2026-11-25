@@ -84,7 +84,9 @@ beforeEach(() => {
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
         (!filters.source || finding.source === filters.source) &&
-        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)) &&
+        (!filters.location_scope || finding.resource_location.scope === filters.location_scope) &&
+        (!filters.resource_region || finding.resource_location.region === filters.resource_region),
     );
     const today = new Date();
     const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -125,7 +127,9 @@ beforeEach(() => {
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
         (!filters.source || finding.source === filters.source) &&
-        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)) &&
+        (!filters.location_scope || finding.resource_location.scope === filters.location_scope) &&
+        (!filters.resource_region || finding.resource_location.region === filters.resource_region),
     );
     const today = new Date();
     const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -162,7 +166,9 @@ beforeEach(() => {
         (!filters.status || finding.status === filters.status) &&
         (!filters.severity || finding.severity === filters.severity) &&
         (!filters.source || finding.source === filters.source) &&
-        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)),
+        (!filters.provider_status || (filters.provider_status === "none" ? finding.provider === null : finding.provider?.status === filters.provider_status)) &&
+        (!filters.location_scope || finding.resource_location.scope === filters.location_scope) &&
+        (!filters.resource_region || finding.resource_location.region === filters.resource_region),
     );
     const start = (filters.page - 1) * filters.page_size;
     return {
@@ -240,10 +246,13 @@ describe("API-connected findings workbench", () => {
     const finding = serverFindings[1];
     finding.source = "aws-access-analyzer";
     finding.provider = syntheticProvider("ACTIVE");
+    finding.resource_location = { scope: "region", region: "ap-southeast-1" };
     render(<App />);
     await screen.findByRole("button", { name: `View ${finding.title}` });
     fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "ACTIVE" } });
     await screen.findByLabelText("1 matching findings");
+    fireEvent.click(await screen.findByRole("button", { name: "Filter findings in ap-southeast-1 (1)" }));
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, provider_status: "ACTIVE", location_scope: "region", resource_region: "ap-southeast-1" }));
     fireEvent.click(screen.getByRole("button", { name: `View ${finding.title}` }));
     await screen.findByText("No provider changes have been recorded for this finding.");
     const reason = "Synthetic resolution draft kept while refreshing.";
@@ -272,9 +281,12 @@ describe("API-connected findings workbench", () => {
     expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
     expect(screen.getByText("Analyst status: Investigating")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Provider status" })).toHaveValue("ACTIVE");
-    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, provider_status: "ACTIVE" });
-    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ provider_status: "ACTIVE" });
-    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ provider_status: "ACTIVE" });
+    expect(screen.getByRole("combobox", { name: "Resource location" })).toHaveValue("region");
+    expect(screen.getByRole("textbox", { name: "AWS Region code" })).toHaveValue("ap-southeast-1");
+    const filters = { provider_status: "ACTIVE", location_scope: "region", resource_region: "ap-southeast-1" };
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, ...filters });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith(filters);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith(filters);
     expect(mockedApi.getFinding).toHaveBeenCalledTimes(2);
     expect(mockedApi.listNotes).toHaveBeenCalledTimes(2);
     expect(mockedApi.listHistory).toHaveBeenCalledTimes(2);
@@ -481,6 +493,108 @@ describe("API-connected findings workbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
     expect(screen.getByRole("combobox", { name: "Provider status" })).toHaveValue("all");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({});
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({});
+  });
+
+  it("combines map selections with existing filters and clears the exact Region on scope changes", async () => {
+    serverFindings = serverFindings.map((finding, index) => ({
+      ...finding, observed_at: new Date().toISOString(), source: "aws-access-analyzer",
+      status: "new", severity: "medium", provider: syntheticProvider(index === 2 ? "ARCHIVED" : "ACTIVE"),
+      resource_location: index < 3
+        ? { scope: "region", region: index === 1 ? "us-west-2" : "ap-southeast-1" }
+        : index === 3 ? { scope: "global", region: null } : { scope: "unknown", region: null },
+    }));
+    render(<App />);
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "ACTIVE" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Analyst status" }), { target: { value: "new" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Triage priority" }), { target: { value: "medium" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "aws-access-analyzer" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Filter findings in ap-southeast-1 (1)" }));
+    await screen.findByLabelText("1 matching findings");
+    const retained = { status: "new", severity: "medium", source: "aws-access-analyzer", provider_status: "ACTIVE" };
+    const filters = { ...retained, location_scope: "region", resource_region: "ap-southeast-1" };
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ ...filters, page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith(filters);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith(filters);
+    expect(screen.getByRole("textbox", { name: "AWS Region code" })).toHaveValue("ap-southeast-1");
+    expect(screen.getByRole("button", { name: `View ${serverFindings[0].title}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `View ${serverFindings[1].title}` })).not.toBeInTheDocument();
+    const timeChart = screen.getByRole("heading", { name: "Findings over time" }).closest("article")!;
+    expect(within(timeChart).getByText("1", { selector: "strong" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Resource location" }), { target: { value: "all" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Filter global resources (1)" }));
+    await screen.findByRole("button", { name: `View ${serverFindings[3].title}` });
+    expect(screen.queryByRole("textbox", { name: "AWS Region code" })).not.toBeInTheDocument();
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ ...retained, location_scope: "global", page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ ...retained, location_scope: "global" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ ...retained, location_scope: "global" });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await screen.findByRole("button", { name: `View ${serverFindings[0].title}` });
+    expect(screen.getByRole("combobox", { name: "Resource location" })).toHaveValue("all");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({});
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({});
+  });
+
+  it("reaches unplotted and older-only Regions without treating map windows as queue limits", async () => {
+    serverFindings = serverFindings.slice(0, 2).map((finding, index) => ({
+      ...finding, observed_at: new Date(Date.now() - index * 40 * 86_400_000).toISOString(),
+      resource_location: { scope: "region", region: index === 0 ? "xx-future-1" : "xx-older-1" },
+    }));
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Filter findings in xx-future-1 (1)" }));
+    await screen.findByLabelText("1 matching findings");
+    expect(screen.getByText("List only")).toBeInTheDocument();
+    const field = screen.getByRole("textbox", { name: "AWS Region code" });
+    const reads = mockedApi.listFindings.mock.calls.length;
+    fireEvent.change(field, { target: { value: "  XX-OLDER-1  " } });
+    expect(mockedApi.listFindings).toHaveBeenCalledTimes(reads);
+    fireEvent.click(screen.getByRole("button", { name: "Apply Region" }));
+    await screen.findByRole("button", { name: `View ${serverFindings[1].title}` });
+    expect(screen.getByRole("textbox", { name: "AWS Region code" })).toHaveValue("xx-older-1");
+    const filters = { location_scope: "region", resource_region: "xx-older-1" };
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ ...filters, page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith(filters);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith(filters);
+    await within(screen.getByRole("region", { name: "Findings by AWS Region" })).findByText("No findings match these filters in this period.");
+    const timeChart = screen.getByRole("heading", { name: "Findings over time" }).closest("article")!;
+    expect(within(timeChart).getByText("0", { selector: "strong" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "AWS Region code" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Region" }));
+    await screen.findByLabelText("2 matching findings");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ location_scope: "region", page: 1, page_size: 25 });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ location_scope: "region" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ location_scope: "region" });
+  });
+
+  it("resets queue pagination on map selection and clears an empty location cohort", async () => {
+    serverFindings = Array.from({ length: 30 }, (_, index) => ({
+      ...demoFindings[0], id: `synthetic-location-${index}`, title: `Synthetic location queue ${index}`,
+      observed_at: new Date().toISOString(), resource_location: index === 0
+        ? { scope: "region", region: "ap-southeast-1" } : { scope: "unknown", region: null },
+    }));
+    render(<App />);
+    await screen.findByRole("button", { name: "Filter findings in ap-southeast-1 (1)" });
+    const chartReads = mockedApi.getAnalytics.mock.calls.length;
+    const mapReads = mockedApi.getRegionAnalytics.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByRole("button", { name: "View Synthetic location queue 25" });
+    expect(mockedApi.getAnalytics).toHaveBeenCalledTimes(chartReads);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenCalledTimes(mapReads);
+    fireEvent.click(screen.getByRole("button", { name: "Filter findings in ap-southeast-1 (1)" }));
+    await screen.findByRole("button", { name: "View Synthetic location queue 0" });
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ location_scope: "region", resource_region: "ap-southeast-1", page: 1, page_size: 25 });
+    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "AWS Region code" }), { target: { value: "xx-empty-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply Region" }));
+    const empty = await screen.findByText("No findings match these filters");
+    fireEvent.click(within(empty.parentElement!).getByRole("button", { name: "Clear filters" }));
+    await screen.findByRole("button", { name: "View Synthetic location queue 0" });
+    expect(screen.getByRole("combobox", { name: "Resource location" })).toHaveValue("all");
+    expect(screen.queryByRole("textbox", { name: "AWS Region code" })).not.toBeInTheDocument();
     expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
     expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({});
     expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({});

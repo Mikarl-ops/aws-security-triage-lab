@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from ..resource_location import is_region_code
+
 MAX_PAGE_SIZE = 100
 MAX_FINDINGS_PER_RUN = 1000
 MAX_PAGES_PER_RUN = 25
@@ -236,7 +238,6 @@ def read_findings_bounded(
 
 
 RESOURCE_TYPE_PATTERN = re.compile(r"^AWS::[A-Za-z0-9]+::[A-Za-z0-9]+$")
-REGION_CODE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$")
 PROVIDER_STATUSES = {"ACTIVE", "ARCHIVED", "RESOLVED"}
 GLOBAL_RESOURCE_TYPES = {"AWS::IAM::Role", "AWS::IAM::User"}
 
@@ -265,7 +266,7 @@ def _resource_location(resource_type: str, resource_arn: Any) -> tuple[str, str 
     if len(parts) != 6:
         return "unknown", None
     region = parts[3]
-    if not region or len(region) > 32 or not REGION_CODE_PATTERN.fullmatch(region):
+    if not is_region_code(region):
         return "unknown", None
     return "region", region
 
