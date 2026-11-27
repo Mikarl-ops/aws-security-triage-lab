@@ -132,7 +132,19 @@ Refresh reads the current local tracker data and does not import AWS data or sub
 
 Filters use stored resource location rather than event metadata or source-IP geography. Charts and map counts retain their 30-day UTC window; the queue can include older matches. Map counts describe the currently filtered window, and the location selector can reach scopes absent from those counts.
 
-### 11. Controlled live pilot — deferred
+### 11. Complete source selection
+
+- [x] Expose authenticated source choices from the full stored dataset, independent of queue pages, filters, and analytics windows.
+- [x] Return distinct, sorted, selectable identifiers without finding content or counts.
+- [x] Keep choices stable across filter changes and support a literal `all` source separately from All sources.
+- [x] Refresh and retry the inventory independently without discarding criteria, queue position, or investigation drafts.
+- [x] Retain known choices and the selected source during loading/failure, and handle expired sessions and superseded requests.
+- [x] Reload source choices with dashboard refreshes, including open-review refreshes.
+- [x] Cover later-page/older-only sources, empty inventories, invalid legacy identifiers, permissions, request consistency, and recovery with synthetic checks.
+
+The inventory lists selectable sources across all stored findings. It does not predict counts for the current filters, so a selection can return empty results. Sources with older-only findings remain usable even when chart/map results are empty.
+
+### 12. Controlled live pilot — deferred
 
 Before the first AWS read, record explicit approval for the account and Region, permitted fields, temporary read-only role, database access list, retention window, and purge date. Compare an approved finding with the AWS console without copying identifiers or payloads into public materials. An empty analyzer is a valid result.
 
@@ -151,6 +163,7 @@ Before the first AWS read, record explicit approval for the account and Region, 
 - [x] Provider status can narrow queue and analytics results independently of analyst status.
 - [x] An open investigation can refresh without discarding drafts or an unchanged pending note submission.
 - [x] Explicit resource locations can narrow the queue and analytics, including Region codes without map coordinates.
+- [x] Analysts can select sources absent from the current queue page and recover source choices independently of the review.
 - [x] A viewer can read findings but receives a server-side denial when attempting to modify them.
 - [x] Public examples and CI use synthetic data only.
 - Live verification remains marked pending until an approved read actually occurs.
