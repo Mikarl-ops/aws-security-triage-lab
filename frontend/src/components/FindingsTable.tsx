@@ -1,6 +1,7 @@
 import type { FindingListItem, FindingSeverity, FindingStatus, ProviderStatusFilter, ResourceLocationScope } from "../types";
 import { formatDate, providerStatusLabels, severityLabels, statusLabels } from "../presentation";
 import { LocationFilter } from "./LocationFilter";
+import { SourceFilter } from "./SourceFilter";
 
 export interface FindingFiltersView {
   status: FindingStatus | "all";
@@ -14,7 +15,8 @@ export interface FindingFiltersView {
 interface FindingsTableProps {
   findings: FindingListItem[];
   filters: FindingFiltersView;
-  sources: string[];
+  sourcesRevision: number;
+  onSessionExpired: () => void;
   page: number;
   pageSize: number;
   pages: number;
@@ -30,7 +32,8 @@ interface FindingsTableProps {
 export function FindingsTable({
   findings,
   filters,
-  sources,
+  sourcesRevision,
+  onSessionExpired,
   page,
   pageSize,
   pages,
@@ -107,18 +110,13 @@ export function FindingsTable({
             ))}
           </select>
         </label>
-        <label className="filter-select">
-          <span className="sr-only">Source</span>
-          <select aria-label="Source" onChange={(event) => updateFilter("source", event.target.value)} value={filters.source}>
-            <option value="all">All sources</option>
-            {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-          </select>
-        </label>
+        <SourceFilter value={filters.source} revision={sourcesRevision} onSessionExpired={onSessionExpired}
+          onChange={(source) => updateFilter("source", source)} />
         <LocationFilter scope={filters.locationScope} region={filters.resourceRegion}
           onChange={(scope, region) => onFiltersChange({ ...filters, locationScope: scope, resourceRegion: region })} />
         <button
           className="clear-filters"
-          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
+          onClick={() => onFiltersChange({ status: "all", severity: "all", source: "", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
           type="button"
         >
           Clear filters
@@ -194,7 +192,7 @@ export function FindingsTable({
             <p>Try broadening your search criteria.</p>
             <button
               className="text-button"
-              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "all", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
+              onClick={() => onFiltersChange({ status: "all", severity: "all", source: "", providerStatus: "all", locationScope: "all", resourceRegion: "" })}
               type="button"
             >
               Clear filters

@@ -18,6 +18,13 @@ afterEach(() => {
 });
 
 describe("API client", () => {
+  it("reads the complete source inventory without queue filters or pagination", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockResolvedValue(jsonResponse({ sources: ["all", "synthetic-a", "synthetic-z"] }));
+    await expect(api.getSources()).resolves.toEqual(["all", "synthetic-a", "synthetic-z"]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/findings/sources", expect.objectContaining({ credentials: "same-origin" }));
+  });
+
   it("sends explicit resource placement to the queue and both analytics endpoints", async () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     fetchMock.mockResolvedValue(jsonResponse({}));

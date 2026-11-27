@@ -109,6 +109,11 @@ export const api = {
     return request<FindingSummary>("/findings/summary");
   },
 
+  async getSources() {
+    const response = await request<{ sources: string[] }>("/findings/sources");
+    return response.sources;
+  },
+
   getAnalytics(filters: AnalyticsFilters) {
     const params = new URLSearchParams();
     if (filters.status) params.set("status", filters.status);

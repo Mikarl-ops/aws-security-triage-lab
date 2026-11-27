@@ -632,6 +632,10 @@ a {
 .filter-symbol { color: var(--mint); }
 .filter-select { min-width: 0; }
 
+.source-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.source-filter-help { flex-basis: 100%; max-width: 280px; color: var(--muted); font-size: 0.7rem; }
+.source-filter-help.error-text { color: var(--red); }
+
 .location-filter, .region-code-form { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .region-code-form { flex: 1 1 220px; }
 .region-code-form input { width: 160px; }
@@ -1077,7 +1081,7 @@ tbody tr:hover, tbody tr:focus-within { background: var(--raised); }
   .panel-heading, .filter-bar, .table-footer { padding: 10px; }
   .filter-caption, .table-context { display: none; }
   .filter-bar { gap: 6px; }
-  .location-filter { flex-basis: 100%; }
+  .location-filter, .source-filter { flex-basis: 100%; }
   .filter-select { flex: 1 1 82px; }
   .filter-select select { width: 100%; padding: 6px 4px; font-size: 0.72rem; }
   .clear-filters { min-height: 30px; }

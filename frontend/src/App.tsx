@@ -83,7 +83,7 @@ export function App() {
   const [filters, setFilters] = useState<FindingFiltersView>({
     status: "all",
     severity: "all",
-    source: "all",
+    source: "",
     providerStatus: "all",
     locationScope: "all",
     resourceRegion: "",
@@ -110,11 +110,18 @@ export function App() {
     setDetailError(null);
   }, []);
 
+  const handleSessionExpired = useCallback(() => {
+    setUser(null);
+    closeFinding();
+    setAuthState("anonymous");
+    setAuthError("Your session has expired. Sign in again to continue.");
+  }, [closeFinding]);
+
   const analyticsFilters = useMemo(
     () => ({
       ...(filters.status === "all" ? {} : { status: filters.status }),
       ...(filters.severity === "all" ? {} : { severity: filters.severity }),
-      ...(filters.source === "all" ? {} : { source: filters.source }),
+      ...(filters.source ? { source: filters.source } : {}),
       ...(filters.providerStatus === "all" ? {} : { provider_status: filters.providerStatus }),
       ...(filters.locationScope === "all" ? {} : { location_scope: filters.locationScope }),
       ...(filters.locationScope === "region" && filters.resourceRegion ? { resource_region: filters.resourceRegion } : {}),
@@ -480,9 +487,6 @@ export function App() {
     return <AuthScreen busy={loginBusy} error={authError} onLogin={handleLogin} />;
   }
 
-  const sources = Array.from(
-    new Set([...findings.map((finding) => finding.source), ...(filters.source === "all" ? [] : [filters.source])]),
-  ).sort();
   const userInitials = user.username.slice(0, 2).toUpperCase();
   const connectionState = dashboardError ? "error" : dashboardLoading ? "loading" : "ready";
 
@@ -638,7 +642,8 @@ export function App() {
             page={page}
             pageSize={queryFilters.page_size}
             pages={pages}
-            sources={sources}
+            sourcesRevision={refreshToken}
+            onSessionExpired={handleSessionExpired}
             total={total}
           />
 
