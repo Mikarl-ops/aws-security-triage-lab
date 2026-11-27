@@ -65,6 +65,16 @@ To find an older-only Region, use the code field even if the map has no entry fo
 
 Every applied change returns the queue to page 1. Switching scope clears the exact Region. Either **Clear filters** control removes all criteria, and **Refresh finding** preserves the applied location while retaining open-review drafts.
 
+## Choose a source across the full dataset
+
+The **Source** menu includes selectable sources from all stored findings, including later queue pages and records older than the chart/map window. Its choices stay available when other filters change. Selecting a source applies the same exact identifier to the queue, charts, and map and returns the queue to page 1. A source with only older findings can have queue results and empty analytics. Other criteria can also make a source's results empty.
+
+Choose **Refresh sources** after new synthetic findings are imported to reload the menu independently. This keeps your current criteria, queue page, and open-review drafts in place. **Refresh finding** and other dashboard refreshes also reload the list. Refreshing source choices does not automatically select a new source or save a draft.
+
+While loading, known choices remain usable. A failed read shows **Source list unavailable** with **Retry sources**; the selected source and previously loaded choices remain. This failure does not block the queue or drawer. An empty inventory has its own message, and an expired session returns to sign-in. If a selected source no longer appears in a refreshed inventory, its selection stays until you change or clear it.
+
+**All sources** removes the source criterion. A source actually named `all` is a separate exact selection. Both **Clear filters** controls remove the applied source along with other criteria. The inventory contains only identifiers valid for source filtering; legacy findings with invalid identifiers remain available through unfiltered reads.
+
 ## Browse notes and analyst activity
 
 Each list opens on its newest page and shows the total number of records for that finding. If there are more than 25, **Older notes** and **Newer notes**, or **Older activity events** and **Newer activity events**, move through pages. Records are displayed chronologically within each page. The range and page label show which part of the history is visible.

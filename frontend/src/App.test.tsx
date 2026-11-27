@@ -24,6 +24,7 @@ vi.mock("./api", async (importOriginal) => {
       login: vi.fn(),
       logout: vi.fn(),
       getSummary: vi.fn(),
+      getSources: vi.fn(),
       getAnalytics: vi.fn(),
       getRegionAnalytics: vi.fn(),
       listFindings: vi.fn(),
@@ -78,6 +79,7 @@ beforeEach(() => {
   mockedApi.login.mockResolvedValue(analyst);
   mockedApi.logout.mockResolvedValue(undefined);
   mockedApi.getSummary.mockImplementation(async () => summarize(serverFindings));
+  mockedApi.getSources.mockImplementation(async () => [...new Set(serverFindings.map((finding) => finding.source))].sort());
   mockedApi.getAnalytics.mockImplementation(async (filters) => {
     const matching = serverFindings.filter(
       (finding) =>
@@ -240,6 +242,87 @@ beforeEach(() => {
 });
 
 describe("API-connected findings workbench", () => {
+  it("offers later-page and older sources from page one and preserves the inventory across filters", async () => {
+    serverFindings = Array.from({ length: 30 }, (_, index) => ({
+      ...demoFindings[0], id: `synthetic-source-${index}`, title: `Synthetic source queue ${index}`,
+      source: index === 29 ? "synthetic-older" : "synthetic-recent", provider: null,
+      observed_at: new Date(Date.now() - (index === 29 ? 40 : 0) * 86_400_000).toISOString(),
+    }));
+    render(<App />);
+    const source = await screen.findByRole("combobox", { name: "Source" });
+    await screen.findByRole("button", { name: "View Synthetic source queue 0" });
+    expect(screen.queryByRole("button", { name: "View Synthetic source queue 29" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "synthetic-older" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByRole("button", { name: "View Synthetic source queue 29" });
+    fireEvent.change(source, { target: { value: "synthetic-older" } });
+    await screen.findByLabelText("1 matching findings");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, source: "synthetic-older" });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ source: "synthetic-older" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ source: "synthetic-older" });
+    expect(screen.getByRole("option", { name: "synthetic-recent" })).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 1")).toBeInTheDocument();
+    await within(screen.getByRole("region", { name: "Findings by AWS Region" })).findByText("No findings match these filters in this period.");
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider status" }), { target: { value: "none" } });
+    await waitFor(() => expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, source: "synthetic-older", provider_status: "none" }));
+    expect(mockedApi.getSources).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await screen.findByLabelText("30 matching findings");
+    expect(source).toHaveValue("");
+    expect(screen.getByRole("option", { name: "synthetic-older" })).toBeInTheDocument();
+    expect(mockedApi.getSources).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a source named all as an exact source filter", async () => {
+    serverFindings[0].source = "all";
+    render(<App />);
+    await screen.findByRole("option", { name: "all" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "all" } });
+    await screen.findByLabelText("1 matching findings");
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25, source: "all" });
+    expect(mockedApi.getAnalytics).toHaveBeenLastCalledWith({ source: "all" });
+    expect(mockedApi.getRegionAnalytics).toHaveBeenLastCalledWith({ source: "all" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: "" } });
+    await screen.findByLabelText(`${serverFindings.length} matching findings`);
+    expect(mockedApi.listFindings).toHaveBeenLastCalledWith({ page: 1, page_size: 25 });
+  });
+
+  it("recovers the source list independently while retaining filters and an open review draft", async () => {
+    render(<App />);
+    const finding = serverFindings[0];
+    await screen.findByRole("option", { name: finding.source });
+    fireEvent.change(screen.getByRole("combobox", { name: "Source" }), { target: { value: finding.source } });
+    fireEvent.click(await screen.findByRole("button", { name: `View ${finding.title}` }));
+    const field = await screen.findByRole("textbox", { name: "Add an investigation note" });
+    fireEvent.change(field, { target: { value: "Synthetic draft retained during source refresh." } });
+    await waitFor(() => expect(screen.getByRole("region", { name: "Findings table" })).toHaveAttribute("aria-busy", "false"));
+    const reads = { queue: mockedApi.listFindings.mock.calls.length, charts: mockedApi.getAnalytics.mock.calls.length,
+      map: mockedApi.getRegionAnalytics.mock.calls.length, detail: mockedApi.getFinding.mock.calls.length };
+    mockedApi.getSources.mockRejectedValueOnce(new ApiError(503, { detail: "Synthetic source inventory failure." }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh sources" }));
+    await screen.findByText(/Source list unavailable: Synthetic source inventory failure/);
+    expect(screen.getByRole("combobox", { name: "Source" })).toHaveValue(finding.source);
+    expect(screen.getByRole("button", { name: `View ${finding.title}` })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry sources" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh sources" })).toBeEnabled());
+    expect(field).toHaveValue("Synthetic draft retained during source refresh.");
+    expect(screen.getByRole("combobox", { name: "Source" })).toHaveValue(finding.source);
+    expect(mockedApi.listFindings).toHaveBeenCalledTimes(reads.queue);
+    expect(mockedApi.getAnalytics).toHaveBeenCalledTimes(reads.charts);
+    expect(mockedApi.getRegionAnalytics).toHaveBeenCalledTimes(reads.map);
+    expect(mockedApi.getFinding).toHaveBeenCalledTimes(reads.detail);
+    expect(mockedApi.addNote).not.toHaveBeenCalled();
+    expect(mockedApi.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it("returns to sign-in when the source inventory reports an expired session", async () => {
+    mockedApi.getSources.mockRejectedValueOnce(new ApiError(401, { detail: "Synthetic source session expiry." }));
+    render(<App />);
+    await screen.findByRole("heading", { name: "Sign in to your workspace" });
+    expect(screen.getByText("Your session has expired. Sign in again to continue.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Source" })).not.toBeInTheDocument();
+  });
+
   it("refreshes an open review and its filtered dashboard while retaining drafts", async () => {
     const now = new Date().toISOString();
     serverFindings = serverFindings.map((finding) => ({ ...finding, observed_at: now }));
@@ -261,6 +344,7 @@ describe("API-connected findings workbench", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Add an investigation note" }), { target: { value: note } });
     const refreshed: Finding = { ...finding, version: finding.version + 1, severity: "medium", provider: { ...finding.provider, status: "ARCHIVED", is_public: false } };
     serverFindings[1] = refreshed;
+    serverFindings[2].source = "synthetic-added-source";
     serverNotes[finding.id] = [...(serverNotes[finding.id] ?? []), {
       id: "synthetic-colleague-note", author: "synthetic-colleague", body: "Synthetic collaborator note after refresh.", created_at: now,
     }];
@@ -277,6 +361,8 @@ describe("API-connected findings workbench", () => {
     await screen.findByText("Synthetic collaborator note after refresh.");
     await screen.findByText("Provider fields refreshed");
     await screen.findByLabelText("0 matching findings");
+    await screen.findByRole("option", { name: "synthetic-added-source" });
+    expect(mockedApi.getSources).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("textbox", { name: "Resolution reason" })).toHaveValue(reason);
     expect(screen.getByRole("textbox", { name: "Add an investigation note" })).toHaveValue(note);
     expect(screen.getByText("Analyst status: Investigating")).toBeInTheDocument();

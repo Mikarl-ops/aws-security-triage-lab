@@ -267,6 +267,15 @@ def _page_response(filters, page: int, page_size: int):
     )
 
 
+@bp.get("/findings/sources")
+@login_required
+def sources():
+    if request.args:
+        return problem(400, "Invalid query", "This endpoint does not accept query parameters.")
+    values = db.session.scalars(select(Finding.source).distinct().order_by(Finding.source)).all()
+    return jsonify(sources=[value for value in values if SOURCE_PATTERN.fullmatch(value)])
+
+
 @bp.get("/findings/summary")
 @login_required
 def summary():

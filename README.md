@@ -10,6 +10,7 @@ A local-first project for exploring how AWS security findings can enter an analy
 - Finding details show provider status, public access, and timestamps separately from analyst status. The dashboard labels application-assigned values as triage priority.
 - The queue, charts, and Region map can filter by provider status or absence of provider data, independently of analyst status.
 - Resource location filters distinguish regional, global, and unknown resources. Select a Region or nonzero scope count beside the map, or apply a Region code in the queue controls.
+- Source choices cover the whole stored dataset, including later queue pages and older findings. Refresh or retry the source list independently while keeping filters and open-review drafts.
 - Synthetic imports retain provider changes in a separate history, with before/after values and pages for older events.
 - Open reviews keep unsaved text across refreshes and version conflicts, and require an explicit save after the analyst reviews the refreshed details.
 - **Refresh finding** reloads an open investigation and its dashboard results while preserving drafts and pending note retry protection.

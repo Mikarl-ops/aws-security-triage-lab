@@ -27,6 +27,20 @@ Location filters use only stored `resource_location_scope` and `resource_region`
 
 Region syntax is `^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$` with a maximum length of 32. The API neither normalizes uppercase/whitespace nor checks an AWS Region inventory. A well-formed but unpopulated code returns empty results, including codes without map coordinates. For example, `/findings?resource_region=ap-southeast-1&provider_status=ARCHIVED&status=new` combines all three criteria using AND. Queue date filters remain available alongside location filters.
 
+### `GET /findings/sources`
+
+Returns the distinct selectable source identifiers across all stored findings to authenticated viewers and analysts:
+
+```json
+{"sources": ["aws-access-analyzer", "synthetic"]}
+```
+
+The list is sorted ascending and includes sources found only on later queue pages or outside the analytics window. It is independent of all queue filters and accepts no query parameters; supplying any returns 400. There is no pagination. The response contains source identifiers only, with no finding content or counts; an empty database returns `{"sources": []}`.
+
+Selectable identifiers use the existing source-filter syntax `^[a-z][a-z0-9_-]{0,63}$`. Legacy values outside that syntax are excluded from this list, while their findings remain available through unfiltered reads. The identifier `all` is a valid exact source. Choosing **All sources** in the dashboard omits the `source` parameter instead.
+
+The dashboard loads this inventory after sign-in and refreshes it with dashboard refreshes, including **Refresh finding**. Queue paging and filter changes retain the same choices without reloading the list. **Refresh sources** and **Retry sources** read only this endpoint and preserve all selected criteria, queue position, and open-review drafts. While loading or after a failure, previously loaded choices and the selected source remain available. A failed read has an explicit unavailable state; a 401 follows the existing session-expiry flow.
+
 ### `GET /findings/summary`
 
 Returns total findings and counts by triage status and severity. It does not accept query parameters.
